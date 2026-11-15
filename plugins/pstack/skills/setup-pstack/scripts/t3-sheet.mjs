@@ -36,10 +36,14 @@ export function parseEntry(text) {
   return { providerInstanceId: match[1], model: match[2], options };
 }
 
-// The family is the first segment (`claude`, `gpt`, `grok`) of the model ID's
+// The family is the first segment (`claude`, `gpt`, `gemini`) of the model ID's
 // last `/` part, so a Claude model served by a Codex-driver pool still counts as
 // Claude, and an OpenCode route prefix such as `openrouter/` decides nothing.
-export const family = (model) => model.split("/").pop().split("-")[0];
+// Fable is its own family, `claude-fable`, as Lauren's pstack has it since 0.15.42.
+export function family(model) {
+  const id = model.split("/").pop();
+  return /^claude-fable(?:-|$)/.test(id) ? "claude-fable" : id.split("-")[0];
+}
 
 // A panel's families among its concrete targets. An inherit entry does not
 // count: one sheet serves every thread on the machine, so its family depends on
@@ -67,8 +71,10 @@ export function parseSheet(markdown) {
 // role with its `tier`, and the `alias` a released sheet may still use), its
 // tier defaults, and an `orchestrator_capabilities` catalog. A role with no
 // line runs on its tier's default, so that default must dispatch here too.
+// A `retired` role's line is one a released sheet still carries and no skill
+// reads, so it passes unchecked until setup-pstack drops it.
 // With no catalog, as in the installer's doctor, only the grammar is checked.
-export function checkSheet(sheet, { roles, defaults, catalog }) {
+export function checkSheet(sheet, { roles, defaults, catalog, retired = [] }) {
   const problems = [];
   const byRole = new Map(roles.flatMap((r) => [[r.role, r], ...(r.alias ? [[r.alias, r]] : [])]));
   const seen = new Set();
@@ -77,6 +83,7 @@ export function checkSheet(sheet, { roles, defaults, catalog }) {
       problems.push(`line ${line}: not a "<role>: <value>" line (lowercase role, one space after the colon, no indent or markup)`);
       continue;
     }
+    if (retired.includes(key)) continue;
     const canonical = byRole.get(key)?.role ?? key;
     if (seen.has(canonical)) problems.push(`"${key}" appears twice; only one line may set it`);
     seen.add(canonical);
@@ -166,11 +173,12 @@ if (invoked === fileURLToPath(import.meta.url)) {
     console.error("usage: t3-sheet.mjs <sheet.md> <catalog.json>");
     process.exit(2);
   }
-  const { roles, tiers } = JSON.parse(readFileSync(new URL("../../../models.json", import.meta.url), "utf8"));
+  const { roles, tiers, retired } = JSON.parse(readFileSync(new URL("../../../models.json", import.meta.url), "utf8"));
   const problems = checkSheet(parseSheet(readFileSync(sheetPath, "utf8")), {
     roles,
     defaults: tiers,
     catalog: JSON.parse(readFileSync(catalogPath, "utf8")),
+    retired,
   });
   for (const problem of problems) console.log(problem);
   if (problems.length) process.exit(1);

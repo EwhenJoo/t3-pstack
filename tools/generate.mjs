@@ -200,7 +200,7 @@ export function validatePluginLayout(pluginRoot) {
   }
 }
 
-const TIERS = ["default", "strongest", "panel"];
+const TIERS = ["default", "strongest", "fast", "panel"];
 
 // Check models.json's shape, throwing with the offending tier, role, or entry
 // named. `skillExists(skill)` reports whether a role's skill directory carries
@@ -244,6 +244,8 @@ export function parseModels(raw, skillExists) {
     if (!TIERS.includes(role.tier)) fail(`role "${role.role}" names tier "${role.tier}", which tiers does not define`);
     if (!skillExists(role.skill)) fail(`role "${role.role}" names skill "${role.skill}", which has no SKILL.md`);
   }
+  if (!Array.isArray(raw.retired)) fail('"retired" must be a list');
+  for (const label of raw.retired) if (labels.has(label)) fail(`"${label}" is both a role and retired`);
   return raw;
 }
 
