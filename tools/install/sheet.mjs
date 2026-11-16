@@ -63,7 +63,7 @@ export function moveSheet(sheet, homes) {
   return steps;
 }
 
-export function doctorSheet(sheet, homes, { catalog, roles, tiers, retired, hint }) {
+export function doctorSheet(sheet, homes, { catalog, roles, tiers, retired = [], hint }) {
   const old = homeSheets(homes).filter(isFile);
   if (!isFile(sheet)) {
     const differ = new Set(old.map((path) => readFileSync(path, "utf8"))).size > 1;
@@ -79,7 +79,11 @@ export function doctorSheet(sheet, homes, { catalog, roles, tiers, retired, hint
     }
     return [check("machine sheet", false, "none, so every role runs on its skill's defaults", SETUP_HINT, true)];
   }
-  const problems = checkSheet(parseSheet(readFileSync(sheet, "utf8")), { roles, defaults: tiers, catalog, retired });
+  const lines = parseSheet(readFileSync(sheet, "utf8"));
+  const problems = checkSheet(lines, { roles, defaults: tiers, catalog, retired });
+  // A retired line passes, so a released sheet keeps working, and setup-pstack
+  // drops it on its next run.
+  const stale = [...new Set(lines.map(({ key }) => key).filter((key) => retired.includes(key)))];
   const shadowing = old.filter((path) => !resolvesTo(path, sheet) && !sameBytes(path, sheet));
   return [
     check(
@@ -98,5 +102,8 @@ export function doctorSheet(sheet, homes, { catalog, roles, tiers, retired, hint
       shadowing.length ? `${shadowing.join(", ")} differ from the machine sheet` : "none differ from it",
       `move each aside, then ${hint} to link it`,
     ),
+    ...(stale.length
+      ? [check("retired roles", false, `no skill reads ${stale.map((key) => `"${key}"`).join(", ")}`, `${SETUP_HINT}, which drops them`, true)]
+      : []),
   ];
 }
