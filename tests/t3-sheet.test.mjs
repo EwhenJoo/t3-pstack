@@ -153,7 +153,7 @@ describe("checkSheet against a catalog", () => {
   test("a role with no line is checked on its tier default, as on a machine without Antigravity", () => {
     const noGemini = structuredClone(catalog);
     noGemini.providers = noGemini.providers.filter((p) => p.providerInstanceId !== "antigravity");
-    const panelRoles = roles.filter((r) => r.tier === "panel").map((r) => r.role);
+    const panelRoles = roles.filter((r) => Array.isArray(defaults[r.tier])).map((r) => r.role);
     expect(check("session hook: on", noGemini)).toEqual(
       panelRoles.map(
         (role) => `${role} (no line, tier default): antigravity/gemini-4-carbon: no provider instance "antigravity" in this T3`,
@@ -203,13 +203,11 @@ describe("checkSheet against a catalog", () => {
     expect(check("bug-fix: claudeAgent/claude-fable-5-1, grok/grok-4.7")).toEqual(["bug-fix: takes one entry, not a list"]);
   });
 
-  // Upstream renamed the role in 0.15.21. A sheet setup-pstack wrote before
-  // that keeps the old label, which still counts.
-  test("a strongest judgment line is checked as the hardest tasks role, and setting both fails", () => {
-    expect(check("strongest judgment: grok/grok-4.7 reasoningEffort=xhigh")).toEqual([]);
-    expect(check("strongest judgment: grok/grok-9")).toEqual(['strongest judgment: grok/grok-9: "grok" does not list model "grok-9"']);
-    expect(check("hardest tasks: grok/grok-4.7\nstrongest judgment: grok/grok-4.7")).toEqual([
-      '"strongest judgment" appears twice; only one line may set it',
+  test("the cross-judge pool takes a list of two families, as a panel does", () => {
+    const pool = "arena cross-judge pool";
+    expect(check(`${pool}: claudeAgent/claude-opus-5-5 effort=high, antigravity/gemini-4-carbon thinking_level=high`)).toEqual([]);
+    expect(check(`${pool}: claudeAgent/claude-opus-5-5 effort=high`)).toEqual([
+      `${pool}: a panel needs at least two model families among its targets (inherit-parent does not count), got claude`,
     ]);
   });
 
@@ -261,6 +259,25 @@ describe("checkSheet against a catalog", () => {
     ];
     expect(check(released.join("\n"))).toEqual([]);
     expect(check("how explorer: provider-gone/model-gone")).toEqual([]);
+  });
+
+  // 2.4.0 retired hardest tasks (strongest judgment before upstream's 0.15.21),
+  // the two reflect roles, and architect runners, with pstack 0.15.43. Every
+  // sheet setup-pstack wrote before that carries their lines.
+  test("a sheet written by 2.3.0 still passes with the lines of the roles 2.4.0 retired", () => {
+    const released = [
+      "# defaults: 2",
+      "# budget: large (xhigh)",
+      "bug-fix: claudeAgent/claude-opus-5-5 effort=xhigh",
+      "hardest tasks: claudeAgent/claude-fable-5-2 effort=max",
+      "reflect tooling: claudeAgent/claude-opus-5-5 effort=high fastMode=true",
+      "reflect judgment, divergent, synthesizer: claudeAgent/claude-opus-5-5 effort=xhigh",
+      "arena cross-judge pool: claudeAgent/claude-fable-5-2 effort=high, claudeAgent/claude-opus-5-5 effort=high fastMode=true, antigravity/gemini-4-carbon thinking_level=high",
+      "architect runners: claudeAgent/claude-fable-5-2 effort=high, claudeAgent/claude-opus-5-5 effort=high fastMode=true, antigravity/gemini-4-carbon thinking_level=high",
+      "session hook: on",
+    ];
+    expect(check(released.join("\n"))).toEqual([]);
+    expect(check("strongest judgment: provider-gone/model-gone\narchitect runners: provider-gone/model-gone")).toEqual([]);
   });
 
   test("default effort, an unknown role, and a bad hook value fail; headings and blank lines pass", () => {

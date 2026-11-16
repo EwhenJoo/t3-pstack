@@ -1,11 +1,14 @@
 {
   "tiers": {
     "default": "claudeAgent/claude-opus-5-5 effort=xhigh",
-    "strongest": "claudeAgent/claude-fable-5-2 effort=max",
-    "fast": "claudeAgent/claude-opus-5-5 effort=high fastMode=true",
+    "fast": "claudeAgent/claude-opus-5-5 effort=high",
     "panel": [
       "claudeAgent/claude-fable-5-2 effort=high",
-      "claudeAgent/claude-opus-5-5 effort=high fastMode=true",
+      "claudeAgent/claude-opus-5-5 effort=high",
+      "antigravity/gemini-4-carbon thinking_level=high"
+    ],
+    "judges": [
+      "claudeAgent/claude-opus-5-5 effort=high",
       "antigravity/gemini-4-carbon thinking_level=high"
     ]
   },
@@ -15,14 +18,20 @@
     { "role": "perf-issue", "tier": "default", "skill": "poteto-mode" },
     { "role": "hillclimb", "tier": "default", "skill": "poteto-mode" },
     { "role": "judgment and prose", "tier": "default", "skill": "poteto-mode" },
-    { "role": "hardest tasks", "alias": "strongest judgment", "tier": "strongest", "skill": "poteto-mode" },
-    { "role": "reflect tooling", "tier": "fast", "skill": "reflect" },
-    { "role": "reflect judgment, divergent, synthesizer", "tier": "default", "skill": "reflect" },
     { "role": "arena runners", "tier": "panel", "skill": "arena" },
-    { "role": "arena cross-judge pool", "tier": "panel", "skill": "arena" },
+    { "role": "arena cross-judge pool", "tier": "judges", "skill": "arena" },
     { "role": "swarm workers", "tier": "fast", "skill": "swarm" },
-    { "role": "architect runners", "tier": "panel", "skill": "architect" },
     { "role": "interrogate reviewers", "tier": "panel", "skill": "interrogate" }
   ],
-  "retired": ["how explorer", "how explainer", "why investigators", "why synthesizer"]
+  "retired": [
+    "how explorer",
+    "how explainer",
+    "why investigators",
+    "why synthesizer",
+    "hardest tasks",
+    "strongest judgment",
+    "reflect tooling",
+    "reflect judgment, divergent, synthesizer",
+    "architect runners"
+  ]
 }

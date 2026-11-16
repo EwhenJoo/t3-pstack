@@ -69,8 +69,10 @@ export function parseSheet(markdown) {
 
 // Problems with a parsed sheet, for the role vocabulary of models.json (each
 // role with its `tier`, and the `alias` a released sheet may still use), its
-// tier defaults, and an `orchestrator_capabilities` catalog. A role with no
-// line runs on its tier's default, so that default must dispatch here too.
+// tier defaults, and an `orchestrator_capabilities` catalog. A role whose tier
+// default is a list, a panel or the cross-judge pool, takes a list that spans
+// two model families. A role with no line runs on its tier's default, so that
+// default must dispatch here too.
 // A `retired` role's line is one a released sheet still carries and no skill
 // reads, so it passes unchecked until setup-pstack drops it.
 // With no catalog, as in the installer's doctor, only the grammar is checked.
@@ -101,7 +103,8 @@ export function checkSheet(sheet, { roles, defaults, catalog, retired = [] }) {
       continue;
     }
     const texts = value.split(",");
-    if (role.tier !== "panel" && texts.length > 1) problems.push(`${key}: takes one entry, not a list`);
+    const isList = Array.isArray(defaults[role.tier]);
+    if (!isList && texts.length > 1) problems.push(`${key}: takes one entry, not a list`);
     const entries = [];
     for (const text of texts) {
       try {
@@ -118,7 +121,7 @@ export function checkSheet(sheet, { roles, defaults, catalog, retired = [] }) {
     }
     const targets = texts.map((t) => t.trim()).filter((t) => !INHERIT.includes(t));
     if (new Set(targets).size < targets.length) problems.push(`${key}: lists the same target twice`);
-    if (role.tier === "panel") {
+    if (isList) {
       const families = panelFamilies(runnable);
       if (families.size < 2) {
         problems.push(
