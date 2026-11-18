@@ -297,12 +297,12 @@
     },
     {
       "pattern": "Then invoke this agent with `subagent_type: \"thermo-nuclear-review-subagent\"` and a user prompt containing",
-      "replacement": "Then dispatch this agent as one `delegate_task` child whose brief opens with \"Read `<plugin root>/agents/thermo-nuclear-review-subagent.md` in full and act as it says\" and contains",
+      "replacement": "Then dispatch this agent as one `delegate_task` child whose brief opens with `Read <plugin root>/skills/poteto-mode/worker.md before anything else.`, then a line that reads \"Read `<plugin root>/agents/thermo-nuclear-review-subagent.md` in full and act as it says\", and contains",
       "rationale": "persona by brief (Subagent policy)"
     },
     {
       "pattern": "Then invoke this agent with `subagent_type: \"thermo-nuclear-code-quality-review-subagent\"` and a user prompt containing",
-      "replacement": "Then dispatch this agent as one `delegate_task` child whose brief opens with \"Read `<plugin root>/agents/thermo-nuclear-code-quality-review-subagent.md` in full and act as it says\" and contains",
+      "replacement": "Then dispatch this agent as one `delegate_task` child whose brief opens with `Read <plugin root>/skills/poteto-mode/worker.md before anything else.`, then a line that reads \"Read `<plugin root>/agents/thermo-nuclear-code-quality-review-subagent.md` in full and act as it says\", and contains",
       "rationale": "persona by brief (Subagent policy)"
     },
     {
@@ -313,19 +313,19 @@
     },
     {
       "pattern": "   - `subagent_type: \"thermo-nuclear-review-subagent\"` for",
-      "replacement": "   - a brief that opens with \"Read `<plugin root>/agents/thermo-nuclear-review-subagent.md` and `<plugin root>/skills/thermo-nuclear-review/SKILL.md` in full and act as they say\" for",
+      "replacement": "   - a brief that opens with `Read <plugin root>/skills/poteto-mode/worker.md before anything else.`, then a line that reads \"Read `<plugin root>/agents/thermo-nuclear-review-subagent.md` and `<plugin root>/skills/thermo-nuclear-review/SKILL.md` in full and act as they say\", for",
       "rationale": "persona by brief (Subagent policy)",
       "files": "^skills/thermos/SKILL\\.md$"
     },
     {
       "pattern": "   - `subagent_type: \"thermo-nuclear-code-quality-review-subagent\"` for",
-      "replacement": "   - a brief that opens with \"Read `<plugin root>/agents/thermo-nuclear-code-quality-review-subagent.md` and `<plugin root>/skills/thermo-nuclear-code-quality-review/SKILL.md` in full and act as they say\" for",
+      "replacement": "   - a brief that opens with `Read <plugin root>/skills/poteto-mode/worker.md before anything else.`, then a line that reads \"Read `<plugin root>/agents/thermo-nuclear-code-quality-review-subagent.md` and `<plugin root>/skills/thermo-nuclear-code-quality-review/SKILL.md` in full and act as they say\", for",
       "rationale": "persona by brief (Subagent policy)",
       "files": "^skills/thermos/SKILL\\.md$"
     },
     {
       "pattern": "1. Spawn `Task` with `subagent_type: \"comment-sicko\"`. Pass the scope.",
-      "replacement": "1. Dispatch one `delegate_task` child (`mode: \"async\"`, `role: \"review\"`) whose brief opens with \"Read `<plugin root>/agents/comment-sicko.md` in full and act as it says\" (`<plugin root>` is the directory that holds this plugin's `skills/`). Pass the scope, and no worktree, because a worktree lacks the scope's uncommitted changes.",
+      "replacement": "1. Dispatch one `delegate_task` child (`mode: \"async\"`, `role: \"review\"`) whose brief opens with `Read <plugin root>/skills/poteto-mode/worker.md before anything else.`, then a line that reads \"Read `<plugin root>/agents/comment-sicko.md` in full and act as it says\" (`<plugin root>` is the directory that holds this plugin's `skills/`). Pass the scope, and no worktree, because a worktree lacks the scope's uncommitted changes.",
       "rationale": "Per-skill notes: no-comments",
       "files": "^skills/no-comments/SKILL\\.md$"
     },

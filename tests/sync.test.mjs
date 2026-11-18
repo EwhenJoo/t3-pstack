@@ -158,6 +158,31 @@ describe("applySubstitutions", () => {
       "- Starting any agent, whether a `delegate_task` child or a T3 thread you launch → the first line of its kickoff is `Read <path>/worker.md before anything else.`",
     ],
     [
+      "skills/no-comments/SKILL.md",
+      '1. Spawn `Task` with `subagent_type: "comment-sicko"`. Pass the scope. Pick each subagent\'s reasoning level for the job, per the Subagents section of the **poteto-mode** skill. Do not restate its rules.',
+      '1. Dispatch one `delegate_task` child (`mode: "async"`, `role: "review"`) whose brief opens with `Read <plugin root>/skills/poteto-mode/worker.md before anything else.`, then a line that reads "Read `<plugin root>/agents/comment-sicko.md` in full and act as it says" (`<plugin root>` is the directory that holds this plugin\'s `skills/`). Pass the scope, and no worktree, because a worktree lacks the scope\'s uncommitted changes. Pick each subagent\'s reasoning level for the job, per the Subagents section of the **poteto-mode** skill. Do not restate its rules.',
+    ],
+    [
+      "skills/thermos/SKILL.md",
+      '   - `subagent_type: "thermo-nuclear-review-subagent"` for bugs, breakages, security, devex regressions, feature-flag leaks, and other branch-audit risks.',
+      '   - a brief that opens with `Read <plugin root>/skills/poteto-mode/worker.md before anything else.`, then a line that reads "Read `<plugin root>/agents/thermo-nuclear-review-subagent.md` and `<plugin root>/skills/thermo-nuclear-review/SKILL.md` in full and act as they say", for bugs, breakages, security, devex regressions, feature-flag leaks, and other branch-audit risks.',
+    ],
+    [
+      "skills/thermos/SKILL.md",
+      '   - `subagent_type: "thermo-nuclear-code-quality-review-subagent"` for maintainability, structure, file-size growth, spaghetti, abstractions, and codebase-health risks.',
+      '   - a brief that opens with `Read <plugin root>/skills/poteto-mode/worker.md before anything else.`, then a line that reads "Read `<plugin root>/agents/thermo-nuclear-code-quality-review-subagent.md` and `<plugin root>/skills/thermo-nuclear-code-quality-review/SKILL.md` in full and act as they say", for maintainability, structure, file-size growth, spaghetti, abstractions, and codebase-health risks.',
+    ],
+    [
+      "agents/thermo-nuclear-review-subagent.md",
+      'Then invoke this agent with `subagent_type: "thermo-nuclear-review-subagent"` and a user prompt containing `### Git / diff output` and `### Changed file contents`.',
+      'Then dispatch this agent as one `delegate_task` child whose brief opens with `Read <plugin root>/skills/poteto-mode/worker.md before anything else.`, then a line that reads "Read `<plugin root>/agents/thermo-nuclear-review-subagent.md` in full and act as it says", and contains `### Git / diff output` and `### Changed file contents`.',
+    ],
+    [
+      "agents/thermo-nuclear-code-quality-review-subagent.md",
+      'Then invoke this agent with `subagent_type: "thermo-nuclear-code-quality-review-subagent"` and a user prompt containing `### Git / diff output` and `### Changed file contents`.',
+      'Then dispatch this agent as one `delegate_task` child whose brief opens with `Read <plugin root>/skills/poteto-mode/worker.md before anything else.`, then a line that reads "Read `<plugin root>/agents/thermo-nuclear-code-quality-review-subagent.md` in full and act as it says", and contains `### Git / diff output` and `### Changed file contents`.',
+    ],
+    [
       "skills/poteto-mode/playbooks/autopilot-stack.md",
       "Every loop tick prompt names this file, so each tick sees the no-merge rule.",
       "Every `schedule_task` prompt names this file, so each tick sees the no-merge rule.",
