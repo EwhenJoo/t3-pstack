@@ -622,8 +622,8 @@
     },
     {
       "pattern": "In `check` mode pass `--status-only`.",
-      "replacement": "In `check` mode pass `--status-only --timeout 120 --max-query-errors 2`, which returns inside the 600-second tool cap.",
-      "rationale": "Playbooks: Babysit check",
+      "replacement": "In `check` mode pass `--status-only --timeout 120 --max-query-errors 2`, which returns inside the 600-second tool cap. Run `drive` as a loop inside the turn: run the watcher with `--timeout 540` and the shell's own timeout above 540 seconds and under the 600-second tool cap, act on its verdict, and run it again. Report and stop when the verdict's head SHA, kind, and reason have not changed for two hours, or after three hours in all. A `BLOCKER` with reason `review-required` or `merge-blocked` (exit 6) needs a person, so report it and stop the loop instead of rerunning the watcher. `review-required` is the wait for a human review below, and `merge-blocked`, a branch protection rule the watcher cannot name, goes back to the user. A wait for a human review is `watch_pull_request` and the end of the turn, because another account's review wakes the thread. Unwatch with `unwatch_pull_request` when babysitting stops. The watcher holds `READY` until accounts other than the PR author and the `gh` viewer have been quiet on the PR for `--settle` seconds (default 300) since the latest push, opening, or ready for review, and up to 30 minutes after that while an `eyes` reaction is open, so no per-bot wait rules are needed.",
+      "rationale": "Playbooks: Babysit check. Upstream's babysit has no drive step left to anchor on, so the T3 drive loop follows the check-mode flags: the watcher loops inside the turn, the watch-pr settle overlay (t3-pstack 1.0.5), and the exit 6 merge gates from pstack-claude #95 (t3-pstack 2.0.0-rc.2)",
       "files": "^skills/poteto-mode/playbooks/"
     },
     {

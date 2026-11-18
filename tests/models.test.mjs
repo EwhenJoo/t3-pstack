@@ -74,6 +74,7 @@ describe("parseModels", () => {
     expect(parse((p) => (role(p, "bug-fix").alias = "hillclimb"))).toThrow(
       'models.json: role "hillclimb" appears twice',
     );
+    expect(parse((p) => (p.retired = "hardest tasks"))).toThrow('models.json: "retired" must be a list of role labels');
   });
 
   test("a role whose skill directory does not exist throws naming both", () => {

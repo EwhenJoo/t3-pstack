@@ -14,9 +14,10 @@ export function parseFrontmatter(text) {
   return { data: Bun.YAML.parse(block[1]) ?? {}, body: text.slice(block[0].length) };
 }
 
-// Frontmatter keys only Cursor reads. The port drops each with any indented
-// continuation lines and blank paragraphs.
-const CURSOR_ONLY_KEYS = /^(?:mode|icon|color|reminder|is_background):/;
+// Frontmatter keys only Cursor reads, and `model`, whose upstream value is a
+// Cursor slug that Claude Code cannot resolve. The port drops each with any
+// indented continuation lines and blank paragraphs.
+const CURSOR_ONLY_KEYS = /^(?:mode|icon|color|reminder|is_background|model):/;
 
 // The skill the session-start hook invokes by name. Upstream marks every skill
 // disable-model-invocation: true, which makes the Skill tool refuse it, so the

@@ -241,6 +241,9 @@ describe("deriveT3", () => {
     expect(deriveT3("plugins/pstack/agents/comment-sicko.md", front("is_background: true\n", "Comment Sicko"), models)).toBe(
       front("", "comment-sicko"),
     );
+    expect(deriveT3("plugins/pstack/agents/poteto-agent.md", front("is_background: true\nmodel: claude-opus-5-5-xhigh-fast\n", "Poteto"), models)).toBe(
+      front("", "poteto-agent"),
+    );
   });
 
   test("leaves a reference file's frontmatter alone", () => {

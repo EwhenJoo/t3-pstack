@@ -200,8 +200,12 @@ describe("checkSheet against a catalog", () => {
     ]);
   });
 
-  test("only a panel role takes a list", () => {
+  test("only a role whose default is a list takes a list", () => {
     expect(check("bug-fix: claudeAgent/claude-fable-5-1, grok/grok-4.7")).toEqual(["bug-fix: takes one entry, not a list"]);
+    expect(check("arena cross-judge pool: claudeAgent/claude-opus-5-5, grok/grok-4.7")).toEqual([]);
+    expect(check("arena cross-judge pool: claudeAgent/claude-opus-5-5, claudeAgent/claude-fable-5-1")).toEqual([
+      "arena cross-judge pool: a panel needs at least two model families among its targets (inherit-parent does not count), got claude",
+    ]);
   });
 
   test("the cross-judge pool takes a list of two families, as a panel does", () => {

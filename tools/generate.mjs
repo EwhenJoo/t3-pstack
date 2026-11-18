@@ -226,7 +226,8 @@ export function parseModels(raw, skillExists) {
   const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
   if (!isObject(raw.tiers)) fail('"tiers" must be an object');
   if (!Array.isArray(raw.roles)) fail('"roles" must be a list');
-  for (const tier of TIERS) if (!Object.hasOwn(raw.tiers, tier)) fail(`tiers has no "${tier}"`);
+  if (!Array.isArray(raw.retired) || raw.retired.some((label) => typeof label !== "string")) fail('"retired" must be a list of role labels');
+  for (const tier of Object.keys(TIERS)) if (!Object.hasOwn(raw.tiers, tier)) fail(`tiers has no "${tier}"`);
   for (const [tier, value] of Object.entries(raw.tiers)) {
     if (!TIERS.includes(tier)) fail(`tiers names "${tier}", which is not one of ${TIERS.join(", ")}`);
     const isList = LIST_TIERS.includes(tier);
@@ -255,7 +256,7 @@ export function parseModels(raw, skillExists) {
       if (labels.has(label)) fail(`role "${label}" appears twice`);
       labels.add(label);
     }
-    if (!TIERS.includes(role.tier)) fail(`role "${role.role}" names tier "${role.tier}", which tiers does not define`);
+    if (!Object.hasOwn(TIERS, role.tier)) fail(`role "${role.role}" names tier "${role.tier}", which tiers does not define`);
     if (!skillExists(role.skill)) fail(`role "${role.role}" names skill "${role.skill}", which has no SKILL.md`);
   }
   if (!Array.isArray(raw.retired)) fail('"retired" must be a list');

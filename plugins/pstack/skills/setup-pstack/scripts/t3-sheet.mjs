@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The T3 override sheet: one `<role>: <entry>` line per role, or a
-// comma-separated list for a panel role. An entry is
+// comma-separated list for a role whose tier default is a list. An entry is
 // `<providerInstanceId>/<modelId>` plus `<optionId>=<value>` pairs, or
 // `inherit-parent` (alias `auto`). An entry maps one to one onto a
 // `delegate_task` target, so this file is the only place the grammar lives:
@@ -97,6 +97,7 @@ export function checkSheet(sheet, { roles, defaults, catalog, retired = [] }) {
       problems.push("default effort: T3 entries carry their own options; delete this line");
       continue;
     }
+    if (retired.includes(key)) continue;
     const role = byRole.get(key);
     if (!role) {
       problems.push(`"${key}" is not a pstack role`);
@@ -180,6 +181,7 @@ if (invoked === fileURLToPath(import.meta.url)) {
   const problems = checkSheet(parseSheet(readFileSync(sheetPath, "utf8")), {
     roles,
     defaults: tiers,
+    retired,
     catalog: JSON.parse(readFileSync(catalogPath, "utf8")),
     retired,
   });
