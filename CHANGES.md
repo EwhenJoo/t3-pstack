@@ -2,6 +2,46 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-T3 rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 2.2.9 - Lauren's `2f87c85`: shorter skills, worker.md, one-file how, why, reflect, and architect, and Opus-first defaults capped at xhigh
+
+t3-pstack moves to Lauren Tan's pstack at cursor/plugins `2f87c85` for all three components. Only pstack changed upstream, in [pstack #1236](https://github.com/cursor/plugins/pull/1236) (`bf0c7cd`) and [pstack #1249](https://github.com/cursor/plugins/pull/1249) (`2f87c85`), and its version moves from 0.15.36 to 0.15.43. cursor-team-kit and thermos have no upstream change between the two pins, so their sync moves only the pin.
+
+**What changes in the skills.** Lauren's text is adopted as written, and only its Cursor mechanics take a T3 form.
+
+- poteto-mode is shorter. Its triggers become one short line each, Writing the reply is one paragraph, the Comments section and the Orchestrate playbook are gone, and the playbook list names 22 playbooks. Program-scale work routes to `figure-it-out`. A skipped step no longer stays in the todolist as `skip: <reason>`.
+- A new `poteto-mode/worker.md` holds the operator's rules for every started agent: the kickoff's bar is the whole bar, block only for a failing run or a bug a user would hit, never ask a person a question, open PRs ready, and the PR title and body shape. The first line of every kickoff points at it by absolute path.
+- `how`, `why`, `reflect`, and `architect` are each one short file. how starts one read-only explainer. why answers from the commits and PR discussions behind the code. reflect reads the transcript itself and waits for approval before any skill edit. architect sketches two shapes and routes a large or contested design to `arena`. Their reference files are deleted: three under `architect/references/`, two under `how/references/`, four under `reflect/references/`, and the 12 under `why/references/`. recall starts its own investigator per source.
+- Babysit keeps six rules and its `drive`, `threads-only`, and `check` modes. Its `background` mode is gone. Opening a PR is three paragraphs. The multi-phase plan stops before execution, so `scripts/check-plan.mjs` and its test are deleted, and the scripts' test command, CI, and CONTRIBUTING drop it.
+- The model roles shrink to `feature, refactoring`, `bug-fix`, `perf-issue`, `hillclimb`, `judgment and prose`, `arena runners`, `arena cross-judge pool`, `swarm workers`, and `interrogate reviewers`. No role runs above `xhigh`, and a Fable model runs outside a panel only when the user names it for the task or two Opus 5.5 runs at `xhigh` of the same brief failed their check. setup-pstack offers three budgets, writes a `# defaults: 3` line, and on its next run replaces the old default values of a sheet without that line.
+- statechart ends an arrow into a parent state at the parent's border, so it no longer crosses the parent's title, and reports SANY's line and column when it cannot read a spec. The 14 principle leaves, `unslop`, and `technical-writing` have shorter bodies with the same rules.
+
+**The T3 forms.** `tools/substitutions.json` goes from 170 rules to 129. 73 rules lose their anchor, because Lauren rewrote or deleted the sentence or a longer rule now covers it, and each is deleted or re-anchored on Lauren's new text. A T3 insert survives wherever Lauren kept the behavior it served. The inserts for the Orchestrate playbook, Babysit's `background` mode, and the multi-agent how, why, and reflect go with that text. swarm's step 3 keeps 2.2.8's form for a rejected target, an entry and another target of its family from `orchestrator_capabilities`, through a rule that now anchors after the Task tool's name.
+
+- poteto-mode's Dispatch on T3 now follows the fresh-subagent rule. A persona brief's line after the `worker.md` line reads its agent file, and a research delegate no role names runs on the `judgment and prose` entry, since the `how explorer` role is retired. Starting an agent covers a `delegate_task` child or a T3 thread, because T3 has no Cursor Project workers.
+- Babysit's `drive` loop inside the turn, its `review-required` and `merge-blocked` stop (exit 6), and the settle overlay's note follow the check-mode flags. Shipping's watcher loop follows Lauren's new queued-watcher sentence.
+- reflect keeps the transcript lookup, `find-transcript.mjs` on Claude Code and `resolve-codex-transcript` on Codex. When neither finds the transcript, reflect reads the conversation in its context and says so.
+- arena's judge is never from the parent's vendor, which on T3 is the model's family, so Fable counts as Claude. Among the other vendor's entries, it still prefers one whose model ran the fewest candidates, the port's rule since 1.0.2.
+- poteto-agent's new `model: claude-opus-5-5-xhigh-fast` frontmatter is a Cursor slug, so `deriveT3` drops `model` with the other Cursor-only keys.
+
+**What the port keeps from before.** Lauren's poteto-mode says "Opus 5.5 always runs its `-fast` slug". On T3, speed is the provider's `fastMode` or `serviceTier` option, which costs more, so poteto-mode keeps fast mode for urgent jobs, and setup-pstack adds no speed option. The four rules from Michael Denyer's pstack-claude stay in the poteto-mode fork, which now differs from its derived form in 7 lines.
+
+**Models.** `plugins/pstack/models.json` maps Lauren's new defaults onto T3 targets. Code, prose, and judgment run on `claudeAgent/claude-opus-5-5 effort=xhigh`, `swarm workers` on `effort=high`, and both panels on `claudeAgent/claude-fable-5-1`, `claudeAgent/claude-opus-5-5`, and `codex/gpt-6.1-sol` at `high`. The cross-judge pool drops Fable. Lauren's Gemini seat takes the port's non-Claude entry, `codex/gpt-6.1-sol`, since T3 lists no Gemini provider by default, and Grok leaves the defaults as it leaves Lauren's. The `strongest` tier is gone, and two tiers join: `light` for `swarm workers` and `judges` for the cross-judge pool. A role takes a list when its tier default is a list. The retired labels, `hardest tasks`, `strongest judgment`, `how explorer`, `how explainer`, `why investigators`, `why synthesizer`, `reflect tooling`, `reflect judgment, divergent, synthesizer`, and `architect runners`, move to a new `retired` list. `t3-sheet.mjs` and `doctor` leave a retired line unread, so a sheet written by 2.2.8 still passes. setup-pstack drops those lines on its next run and replaces each 2.2.8 default value it finds in a sheet without the `# defaults: 3` line.
+
+**How the sync ran.** The six declared forks had upstream edits, and the rewrite touched most of upstream's prose, so the tree was rebuilt with `bun tools/sync.mjs pstack 2f87c85 --bootstrap`. Every carried file but the declared forks took its derived form at `2f87c85`. Before that, a harness derived the old pin with 2.2.8's rules and matched every non-fork file byte for byte. The 24 files upstream deleted were removed. Each fork took a three-way merge of its port copy, the old pin's derived text, and the new pin's derived text. Feature, Opening a PR, Shipping, and Worktree cleanup keep their port lines on Lauren's new text. The Opening a PR fork's reason changes, because Lauren removed the `reset --hard` sentence it replaced. setup-pstack takes Lauren's budget ladder, retired roles, and defaults marker in its T3 sheet form. At `2f87c85` each component's dry run reports no undeclared fork, no denylist hit, and no substitution that matches nothing.
+
+No setting or workflow has to change. Neither hooks file changes. On Codex, run `npx -y github:chhoumann/t3-pstack update` after it, as after every release.
+
+| Change | 2.2.8 | 2.2.9 | Source |
+| --- | --- | --- | --- |
+| `bug-fix`, `perf-issue`, `hillclimb` default | `claudeAgent/claude-fable-5-1 effort=xhigh` | `claudeAgent/claude-opus-5-5 effort=xhigh` | pstack #1249 |
+| Panel default | Opus, GPT-6.1 Sol, and Grok 4.7 at `xhigh` | Fable 5.1, Opus 5.5, and GPT-6.1 Sol at `high` | pstack #1236, #1249 |
+| Cross-judge pool default | The panel | Opus 5.5 and GPT-6.1 Sol at `high` | pstack #1249 |
+| `swarm workers` default | `effort=xhigh` | `effort=high` | pstack #1236 |
+| Highest level | `max`, under the `unlimited` budget | `xhigh` | pstack #1249 |
+| how, why, reflect, architect | Multi-agent skills with their own roles and references | One short file each | pstack #1236, #1249 |
+| Orchestrate playbook and `check-plan.mjs` | Shipped | Removed | pstack #1249 |
+| Started agents | The brief only | The first line points at `worker.md` | pstack #1249 |
+
 ## 2.2.8 - The worktree audit reads git refs by their full name and holds a branch's open PR
 
 The worktree audit marks a worktree `safe` to prune when its HEAD is merged into the base or its branch has a PR that is not open. Three lookups could read unmerged or open work as safe.

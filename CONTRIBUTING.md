@@ -49,7 +49,7 @@ GIT_CONFIG_GLOBAL=/dev/null bun test tests/ --timeout 30000
 
 The generator stamps `VERSION` into the Claude Code and Codex manifests, the marketplace entry, and `package.json`. It renders each model-consuming skill's Models section and setup-pstack's sheet block from `plugins/pstack/models.json`, lists the plugin's agents in the Claude Code manifest, and copies the license and notice files into the installed plugin. It checks each skill's frontmatter, every local Markdown link, the plugin layout, agent frontmatter, the Codex marketplace, and both hooks files against their pins in `tools/frozen-hooks.json`. CI runs `bun tools/generate.mjs --check`, which writes nothing and fails naming each generated file that is stale or orphaned, so commit the generator's output. `.pre-commit-config.yaml` runs the same check before each commit once you run `prek install` (or `pre-commit install`).
 
-Change model defaults in `models.json`, never in a skill body. A role names a tier (`default`, `strongest`, or `panel`), and each tier holds T3 entries in the grammar `t3-sheet.mjs` checks. The panel must span two model families. A role may carry an `alias`, the label a sheet written before upstream renamed the role still uses.
+Change model defaults in `models.json`, never in a skill body. A role names a tier (`default`, `light`, `panel`, or `judges`), and each tier holds T3 entries in the grammar `t3-sheet.mjs` checks. A list tier (`panel` or `judges`) must span two model families. A role may carry an `alias`, the label a sheet written before upstream renamed the role still uses. A label upstream retires moves to `retired`, so a sheet that still carries it passes the check and its line goes unread.
 
 If you touched `skills/poteto-mode/scripts/`:
 
@@ -57,7 +57,7 @@ If you touched `skills/poteto-mode/scripts/`:
 cd plugins/pstack/skills/poteto-mode/scripts
 bun install --frozen-lockfile
 bun run typecheck
-GIT_CONFIG_GLOBAL=/dev/null bun test watch-pr check-plan.test.ts
+GIT_CONFIG_GLOBAL=/dev/null bun test watch-pr
 bunx prettier@3.6.2 --check watch-pr/settle.ts watch-pr/settle.test.ts watch-pr/verdicts.test.ts resolve-codex-transcript.ts
 ```
 

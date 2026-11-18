@@ -63,7 +63,7 @@ export function moveSheet(sheet, homes) {
   return steps;
 }
 
-export function doctorSheet(sheet, homes, { catalog, roles, tiers, hint }) {
+export function doctorSheet(sheet, homes, { catalog, roles, tiers, retired, hint }) {
   const old = homeSheets(homes).filter(isFile);
   if (!isFile(sheet)) {
     const differ = new Set(old.map((path) => readFileSync(path, "utf8"))).size > 1;
@@ -79,7 +79,7 @@ export function doctorSheet(sheet, homes, { catalog, roles, tiers, hint }) {
     }
     return [check("machine sheet", false, "none, so every role runs on its skill's defaults", SETUP_HINT, true)];
   }
-  const problems = checkSheet(parseSheet(readFileSync(sheet, "utf8")), { roles, defaults: tiers, catalog });
+  const problems = checkSheet(parseSheet(readFileSync(sheet, "utf8")), { roles, defaults: tiers, retired, catalog });
   const shadowing = old.filter((path) => !resolvesTo(path, sheet) && !sameBytes(path, sheet));
   return [
     check(

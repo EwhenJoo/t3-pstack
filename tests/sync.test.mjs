@@ -91,11 +91,11 @@ describe("applySubstitutions", () => {
       expect(applySubstitutions(line(slug), RULES.substitutions, "skills/poteto-mode/playbooks/hillclimb.md").text).toBe(
         "your configured hillclimb model (default in poteto-mode's [Models](../SKILL.md#models))",
       );
-      expect(applySubstitutions(line(slug), RULES.substitutions, "skills/reflect/SKILL.md").text).toBe(
-        "your configured hillclimb model (default in [Models](#models))",
+      expect(applySubstitutions(`by default \`${slug}\`, \`${slug}\`, and \`${slug}\`.`, RULES.substitutions, "skills/arena/SKILL.md").text).toBe(
+        "by default the entries in [Models](#models).",
       );
     }
-    expect(applySubstitutions("(default `true`)", RULES.substitutions, "skills/reflect/SKILL.md").text).toBe("(default `true`)");
+    expect(applySubstitutions("by default `true`.", RULES.substitutions, "skills/arena/SKILL.md").text).toBe("by default `true`.");
   });
 
   test("every rule's replacement is free of the denylist", () => {
@@ -119,18 +119,23 @@ describe("applySubstitutions", () => {
   test.each([
     [
       "skills/how/SKILL.md",
-      "Every spawn is a Task subagent with `subagent_type: generalPurpose` and `readonly: true`.",
-      'Every spawn is a `delegate_task` child with `role: "research"` and a brief that says to inspect only and change no file.',
+      "Spawn one Task subagent with `subagent_type: generalPurpose` and `readonly: true` that explores and explains in one pass.",
+      'Spawn one `delegate_task` child with `role: "research"`, a brief that says to inspect only and change no file, and `target` from the `judgment and prose` line in the model sheet (default in poteto-mode\'s [Models](../poteto-mode/SKILL.md#models)). It explores and explains in one pass.',
     ],
     [
-      "skills/why/SKILL.md",
-      "Each spawn below names a role line in the `pstack-models.mdc` rule and a default. Set `model` to that line's value, or to the default if the rule or the line is missing. Leave `model` unset when the value is `auto` or `inherit-parent`. If the Task tool rejects a slug, use the default and say so. If it rejects the default, use the closest valid slug of the same family from its error message.",
-      "Each spawn below names a role line in the model sheet and a default. Set `target` from that line's entry, or from the default if the sheet or the line is missing. Leave `target` unset when the value is `auto` or `inherit-parent`. If `delegate_task` rejects an entry, use the default and say so. If it rejects the default, use another target of the same family from `orchestrator_capabilities`.",
+      "skills/recall/SKILL.md",
+      "Spawn one investigator subagent per source, in agent mode because readonly strips MCP access, and ask each",
+      "Spawn one investigator subagent per source, with full tool access because each needs MCP access, and ask each",
     ],
     [
       "skills/arena/SKILL.md",
-      "Families go by prefix: `claude-*`, and `grok-*` with `cursor-grok-*` and `composer-*`. A refused `composer-*` entry runs on `grok-4.7-xhigh-fast`.",
-      "A model's family is the first segment of its ID's last `/` part, such as `claude`, `gpt`, or `grok`, whatever provider instance serves it.",
+      "Families go by prefix, and the longest match wins: `claude-fable-*`, `claude-*`, and `gemini-*`, after dropping a leading `cursor-`. Any other slug's family is its text before the first hyphen.",
+      "A model's family is the first segment of its ID's last `/` part, such as `claude`, `gpt`, or `grok`, whatever provider instance serves it, so a Fable model's family is `claude`.",
+    ],
+    [
+      "skills/swarm/SKILL.md",
+      "If the Task tool rejects a slug, use the default and say so. If it rejects the default, use the closest valid slug of the same family from its error message.",
+      "If `delegate_task` rejects an entry, use the default and say so. If it rejects the default, use another target of the same family from `orchestrator_capabilities`.",
     ],
     [
       "skills/interrogate/SKILL.md",
@@ -139,18 +144,18 @@ describe("applySubstitutions", () => {
     ],
     [
       "skills/poteto-mode/SKILL.md",
-      "If the Task tool rejects that too, continue with the calling skill's fallback. A slug counts as rejected once a Task error says that the model is not valid, or leaves the slug out of its list of valid slugs. Never pass a rejected slug, and skip any fallback whose slug is already rejected. When the calling skill has no fallback, use the closest valid slug of the role's family from the error's list of valid slugs, or omit `model` so the subagent runs on the parent model when the list has none. When the calling skill's fallback runs out of slugs without saying what to do next, omit `model` too. Say so in both cases.",
-      "If `delegate_task` rejects that too, continue with the calling skill's fallback. An entry counts as rejected once `delegate_task` fails on it with `model_unavailable` or `provider_unavailable`, or rejects its options. Never pass a rejected entry, and skip any fallback whose entry is already rejected. When the calling skill has no fallback, use the closest target of the role's family that `orchestrator_capabilities` lists, or omit `target` so the subagent runs on the parent model when it lists none. When the calling skill's fallback runs out of entries without saying what to do next, omit `target` too. Say so in both cases.",
+      "If the Task tool rejects a slug, never pass it again. Fall back to the role's line or default, then the calling skill's fallback, then the closest valid slug of the same family, then omit `model`. Say so.",
+      "If `delegate_task` rejects an entry, never pass it again. An entry counts as rejected once `delegate_task` fails on it with `model_unavailable` or `provider_unavailable`, or rejects its options. Fall back to the role's line or default, then the calling skill's fallback, then the closest target of the same family that `orchestrator_capabilities` lists, then omit `target`. Say so.",
     ],
     [
       "skills/poteto-mode/SKILL.md",
-      "Otherwise use standard speed, the same slug without `-fast`. Verification is the exception and stays on the `swarm workers` model and speed (`grok-4.7-xhigh-fast` by default).",
-      "Otherwise use standard speed, the entry without that option. Verification is the exception and stays on the `swarm workers` model and speed (default in the **swarm** skill's Models section).",
+      "Opus 5.5 always runs its `-fast` slug. Verification always runs on the `swarm workers` model, `claude-opus-5-5-high-fast` by default.",
+      "Use fast mode, the provider's speed option (`fastMode=true` on Claude, a fast `serviceTier` such as `priority` on Codex), only when the job is urgent, meaning CI or trunk is red or a person is blocked on the result right now. Otherwise use standard speed, the entry without that option. Verification always runs on the `swarm workers` model (default in the **swarm** skill's Models section).",
     ],
     [
       "skills/poteto-mode/SKILL.md",
-      "on an explicit pause, going offline, a Cursor restart, or imminent context compaction.",
-      "on an explicit pause, going offline, an app restart, or imminent context compaction.",
+      "- Starting any agent, whether a Task subagent or a Project worker → the first line of its kickoff is `Read <path>/worker.md before anything else.`",
+      "- Starting any agent, whether a `delegate_task` child or a T3 thread you launch → the first line of its kickoff is `Read <path>/worker.md before anything else.`",
     ],
     [
       "skills/poteto-mode/playbooks/autopilot-stack.md",
@@ -170,9 +175,9 @@ describe("applySubstitutions", () => {
 
   // The T3 behavior the port adds on an upstream anchor: each must survive.
   test.each([
-    ["skills/poteto-mode/SKILL.md", "Interrupt-chained resumes silently drop directives, so fire a fresh subagent with consolidated scope rather than trusting a \"done\" summary.", ["**Dispatch on T3.**", "dispatch ledger", "`BLOCKED: independent review`", "`clientRequestId`", "you are a leaf", "`isolation: \"worktree\"`", "`Unable to resolve the parent checkout commit`"]],
-    ["skills/arena/SKILL.md", "With the default pool, a Claude parent gets `grok-4.7-xhigh-fast`. A parent from any other family gets `claude-opus-5-5-xhigh` first.", ["no model scores its own work"]],
-    ["skills/poteto-mode/playbooks/babysit.md", "Run `drive` and `background` under `/loop` in dynamic mode.", ["--timeout 540", "watch_pull_request", "--settle"]],
+    ["skills/poteto-mode/SKILL.md", "Resume an existing subagent only when the work needs state that lives in it and is costly to move: its checkout, its uncommitted changes, or a process it still runs.", ["**Dispatch on T3.**", "`worker.md` line", "dispatch ledger", "`BLOCKED: independent review`", "`clientRequestId`", "you are a leaf", "`isolation: \"worktree\"`", "`Unable to resolve the parent checkout commit`"]],
+    ["skills/arena/SKILL.md", "The judge is never from the parent's vendor, and Fable counts as Claude for that check, so use the first entry from another vendor.", ["no model scores its own work"]],
+    ["skills/poteto-mode/playbooks/babysit.md", "In `check` mode pass `--status-only`.", ["--timeout 540", "watch_pull_request", "--settle", "exit 6"]],
     ["skills/poteto-mode/playbooks/autopilot-full.md", "Each owner is a Cursor cloud agent that builds, opens its PR", ["`delegate_task` child", "`isolation: \"worktree\"`", "t3_thread_send"]],
     ["skills/no-comments/SKILL.md", '1. Spawn `Task` with `subagent_type: "comment-sicko"`. Pass the scope.', ["<plugin root>/agents/comment-sicko.md", "no worktree"]],
   ])("%s keeps its T3 insert", (rel, upstream, needles) => {

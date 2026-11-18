@@ -575,4 +575,22 @@ describe("the model sheet", () => {
       fix: "run /t3-pstack:setup-pstack in a T3 thread",
     });
   });
+
+  test("doctor passes a sheet that still carries the lines of roles upstream retired", () => {
+    const home = tmp();
+    mkdirSync(join(home, ".config/t3-pstack"), { recursive: true });
+    writeFileSync(
+      join(home, ".config/t3-pstack/models.md"),
+      "hardest tasks: claudeAgent/claude-fable-5-1 effort=xhigh\nhow explorer: inherit-parent\nbug-fix: inherit-parent\n",
+    );
+    const r = spawnSync(process.execPath, [join(repoRoot, "tools/install.mjs"), "doctor", "--json"], {
+      env: { HOME: home, PATH: tmp() },
+      encoding: "utf8",
+    });
+    expect(r.status === 0 && JSON.parse(r.stdout).sheet.checks[0]).toEqual({
+      name: "machine sheet valid",
+      ok: true,
+      detail: "every line parses (pass --catalog to check targets)",
+    });
+  });
 });

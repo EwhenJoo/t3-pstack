@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The T3 override sheet: one `<role>: <entry>` line per role, or a
-// comma-separated list for a panel role. An entry is
+// comma-separated list for a role whose tier default is a list. An entry is
 // `<providerInstanceId>/<modelId>` plus `<optionId>=<value>` pairs, or
 // `inherit-parent` (alias `auto`). An entry maps one to one onto a
 // `delegate_task` target, so this file is the only place the grammar lives:
@@ -65,10 +65,12 @@ export function parseSheet(markdown) {
 
 // Problems with a parsed sheet, for the role vocabulary of models.json (each
 // role with its `tier`, and the `alias` a released sheet may still use), its
-// tier defaults, and an `orchestrator_capabilities` catalog. A role with no
-// line runs on its tier's default, so that default must dispatch here too.
+// tier defaults, its `retired` labels, and an `orchestrator_capabilities`
+// catalog. A role with no line runs on its tier's default, so that default must
+// dispatch here too. A role whose tier default is a list takes a list. A
+// retired label's line is left unread, since no skill looks it up.
 // With no catalog, as in the installer's doctor, only the grammar is checked.
-export function checkSheet(sheet, { roles, defaults, catalog }) {
+export function checkSheet(sheet, { roles, defaults, retired = [], catalog }) {
   const problems = [];
   const byRole = new Map(roles.flatMap((r) => [[r.role, r], ...(r.alias ? [[r.alias, r]] : [])]));
   const seen = new Set();
@@ -88,13 +90,15 @@ export function checkSheet(sheet, { roles, defaults, catalog }) {
       problems.push("default effort: T3 entries carry their own options; delete this line");
       continue;
     }
+    if (retired.includes(key)) continue;
     const role = byRole.get(key);
     if (!role) {
       problems.push(`"${key}" is not a pstack role`);
       continue;
     }
     const texts = value.split(",");
-    if (role.tier !== "panel" && texts.length > 1) problems.push(`${key}: takes one entry, not a list`);
+    const isList = Array.isArray(defaults[role.tier]);
+    if (!isList && texts.length > 1) problems.push(`${key}: takes one entry, not a list`);
     const entries = [];
     for (const text of texts) {
       try {
@@ -111,7 +115,7 @@ export function checkSheet(sheet, { roles, defaults, catalog }) {
     }
     const targets = texts.map((t) => t.trim()).filter((t) => !INHERIT.includes(t));
     if (new Set(targets).size < targets.length) problems.push(`${key}: lists the same target twice`);
-    if (role.tier === "panel") {
+    if (isList) {
       const families = panelFamilies(runnable);
       if (families.size < 2) {
         problems.push(
@@ -166,10 +170,11 @@ if (invoked === fileURLToPath(import.meta.url)) {
     console.error("usage: t3-sheet.mjs <sheet.md> <catalog.json>");
     process.exit(2);
   }
-  const { roles, tiers } = JSON.parse(readFileSync(new URL("../../../models.json", import.meta.url), "utf8"));
+  const { roles, tiers, retired } = JSON.parse(readFileSync(new URL("../../../models.json", import.meta.url), "utf8"));
   const problems = checkSheet(parseSheet(readFileSync(sheetPath, "utf8")), {
     roles,
     defaults: tiers,
+    retired,
     catalog: JSON.parse(readFileSync(catalogPath, "utf8")),
   });
   for (const problem of problems) console.log(problem);
