@@ -23,10 +23,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { doctorAntigravity, installAntigravity } from "../tools/install/antigravity.mjs";
 import { doctorClaude, installClaude, syncScopedRecords } from "../tools/install/claude.mjs";
 import { AppServer, pinCheck } from "../tools/install/codex.mjs";
 import { parseSource, writeAtomic } from "../tools/install/common.mjs";
-import { discoverHomes } from "../tools/install/homes.mjs";
+import { antigravityProfile, discoverHomes } from "../tools/install/homes.mjs";
 import { doctorSheet, moveSheet } from "../tools/install/sheet.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -96,6 +97,29 @@ describe("discoverHomes", () => {
       ],
       settings: { path: join(t3, "userdata/settings.json"), instances: 6, error: undefined },
     });
+  });
+
+  test("finds each Antigravity instance's profile where T3 keeps it, and needs no CLI for it", () => {
+    const t3 = tmp();
+    writeJson(join(t3, "userdata/settings.json"), {
+      providerInstances: {
+        antigravity: { driver: "antigravity", displayName: "Antigravity", enabled: true },
+        agy_work: { driver: "antigravity", enabled: false },
+      },
+    });
+    const found = discoverHomes({ env: { T3CODE_HOME: t3 }, home: "/home/u" });
+    // T3's own profile for the default instance, as this machine's T3 named it.
+    const profiles = join(t3, "userdata/providers/antigravity");
+    expect(found.homes.slice(2)).toEqual([
+      {
+        harness: "antigravity",
+        dir: join(profiles, "ac0a3dfd6dddb20962cecff6ee5fe65e19d3923be20e52c5ab52ff877f7e4c32"),
+        from: ["T3 instance antigravity"],
+        bin: null,
+      },
+      { harness: "antigravity", dir: antigravityProfile(join(t3, "userdata/settings.json"), "agy_work"), from: ["T3 instance agy_work (disabled)"], bin: null },
+    ]);
+    expect(found.settings.instances).toBe(2);
   });
 
   test("expands a leading ~ in an instance's home variable and binary as T3 does", () => {
@@ -597,5 +621,100 @@ describe("the model sheet", () => {
         warn: true,
       },
     ]);
+  });
+});
+
+// An Antigravity profile as T3 leaves it after a first start, holding agy's
+// own config and no plugin.
+function antigravityHome() {
+  const dir = tmp();
+  writeJson(join(dir, "config/config.json"), { plugins: { swarm: { enabled: true } } });
+  return { harness: "antigravity", dir, from: ["T3 instance antigravity"], bin: null };
+}
+const pluginRoot = join(repoRoot, "plugins/pstack");
+const shipped = JSON.parse(readFileSync(join(pluginRoot, ".antigravity-plugin/plugin.json"), "utf8")).version;
+const agy = { pluginRoot, version: shipped, skills, hint: FIX };
+const installedAt = (home) => join(home.dir, "config/plugins/t3-pstack");
+
+describe("Antigravity", () => {
+  test("copies the plugin into the profile, where agy discovers it, and a second run changes nothing", () => {
+    const home = antigravityHome();
+    expect(installAntigravity(home, agy)).toEqual([`installed ${shipped}`]);
+    for (const file of ["hooks.json", ".antigravity-plugin/plugin.json", "hooks/session-start.sh", "skills/poteto-mode/SKILL.md"]) {
+      expect(readFileSync(join(installedAt(home), file))).toEqual(readFileSync(join(pluginRoot, file)));
+    }
+    expect(installAntigravity(home, agy)).toEqual([]);
+    expect(readdirSync(join(home.dir, "config/plugins"))).toEqual(["t3-pstack"]);
+    expect(doctorAntigravity(home, agy)).toEqual([
+      { name: "installed", ok: true, detail: shipped },
+      { name: "enabled", ok: true, detail: "yes" },
+    ]);
+  });
+
+  test("replaces an older copy whole, so a file the release dropped goes with it", () => {
+    const home = antigravityHome();
+    installAntigravity(home, agy);
+    writeJson(join(installedAt(home), ".antigravity-plugin/plugin.json"), { name: "t3-pstack", version: "2.3.0" });
+    writeFileSync(join(installedAt(home), "dropped.md"), "gone in this release\n");
+    expect(doctorAntigravity(home, agy)[0]).toEqual({ name: "installed", ok: false, detail: `2.3.0, expected ${shipped}`, fix: FIX });
+    expect(installAntigravity(home, agy)).toEqual([`updated 2.3.0 to ${shipped}`]);
+    expect(existsSync(join(installedAt(home), "dropped.md"))).toBe(false);
+    expect(readdirSync(join(home.dir, "config/plugins"))).toEqual(["t3-pstack"]);
+  });
+
+  test("reinstalls a copy whose skills are missing", () => {
+    const home = antigravityHome();
+    installAntigravity(home, agy);
+    rmSync(join(installedAt(home), "skills/how"), { recursive: true });
+    expect(doctorAntigravity(home, agy)[0]).toMatchObject({ ok: false, detail: `${shipped}, but its files at ${installedAt(home)} are missing` });
+    expect(installAntigravity(home, agy)).toEqual([`reinstalled ${shipped}, whose files were missing`]);
+    expect(existsSync(join(installedAt(home), "skills/how/SKILL.md"))).toBe(true);
+  });
+
+  test("creates a profile T3 has not started yet, private as T3 keeps it", () => {
+    const home = { harness: "antigravity", dir: join(tmp(), "providers/antigravity/abc"), from: [], bin: null };
+    expect(installAntigravity(home, agy)).toEqual([`installed ${shipped}`]);
+    expect(mode(home.dir)).toBe(0o700);
+    expect(doctorAntigravity(home, agy).every((c) => c.ok)).toBe(true);
+  });
+
+  test("doctor fails a plugin the profile's config turns off, and never edits that config", () => {
+    const home = antigravityHome();
+    installAntigravity(home, agy);
+    const config = join(home.dir, "config/config.json");
+    writeJson(config, { plugins: { "t3-pstack": { enabled: false } } });
+    expect(installAntigravity(home, agy)).toEqual([]);
+    expect(JSON.parse(readFileSync(config, "utf8"))).toEqual({ plugins: { "t3-pstack": { enabled: false } } });
+    expect(doctorAntigravity(home, agy)[1]).toEqual({
+      name: "enabled",
+      ok: false,
+      detail: `no, ${config} turns it off`,
+      fix: 'turn t3-pstack on in that file\'s "plugins" map',
+    });
+  });
+
+  test("the installer CLI installs into each Antigravity profile, with no claude or codex on PATH", () => {
+    const user = tmp();
+    const bin = join(user, "bin");
+    mkdirSync(bin);
+    symlinkSync(spawnSync("node", ["-p", "process.execPath"], { encoding: "utf8" }).stdout.trim(), join(bin, "node"));
+    const settings = join(user, ".t3/userdata/settings.json");
+    writeJson(settings, { providerInstances: { antigravity: { driver: "antigravity", enabled: true } } });
+    const run = (command) => {
+      const r = spawnSync(join(bin, "node"), [join(repoRoot, "tools/install.mjs"), command, "--source", repoRoot, "--json"], {
+        cwd: user,
+        env: { PATH: `${bin}:/usr/bin:/bin`, HOME: user },
+        encoding: "utf8",
+      });
+      return JSON.parse(r.stdout);
+    };
+    const profile = antigravityProfile(settings, "antigravity");
+    const row = (report) => report.homes.find((h) => h.harness === "antigravity");
+    const first = run("install");
+    expect(row(first)).toMatchObject({ dir: profile, steps: [`installed ${shipped}`] });
+    expect(row(first).checks.every((c) => c.ok)).toBe(true);
+    expect(row(run("update")).steps).toEqual([]);
+    expect(row(run("doctor")).checks.map((c) => c.name)).toEqual(["installed", "enabled"]);
+    expect(existsSync(join(profile, "t3-pstack-models.md"))).toBe(false);
   });
 });
