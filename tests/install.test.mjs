@@ -30,7 +30,7 @@ import { discoverHomes } from "../tools/install/homes.mjs";
 import { doctorSheet, moveSheet } from "../tools/install/sheet.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
-const { roles, tiers } = JSON.parse(readFileSync(join(repoRoot, "plugins/pstack/models.json"), "utf8"));
+const { roles, tiers, retired } = JSON.parse(readFileSync(join(repoRoot, "plugins/pstack/models.json"), "utf8"));
 const FIX = "rerun `npx -y github:chhoumann/t3-pstack install`";
 
 const scratch = [];
@@ -573,6 +573,18 @@ describe("the model sheet", () => {
       ok: false,
       detail: 'bug-fix: "claude-opus" does not start with <providerInstanceId>/<modelId>; "how critics" is not a pstack role',
       fix: "run /t3-pstack:setup-pstack in a T3 thread",
+    });
+  });
+
+  test("doctor passes a sheet that still carries the retired how and why lines", () => {
+    const { homes, sheet } = machine();
+    mkdirSync(join(sheet, ".."), { recursive: true });
+    const released = ["bug-fix: claudeAgent/claude-opus-5-5 effort=xhigh", "how explorer: claudeAgent/claude-opus-5-5 effort=medium"];
+    writeFileSync(sheet, `${released.join("\n")}\nwhy synthesizer: claudeAgent/claude-opus-5-5 effort=xhigh\n`);
+    expect(doctorSheet(sheet, homes, { catalog: null, roles, tiers, retired, hint: FIX })[0]).toEqual({
+      name: "machine sheet valid",
+      ok: true,
+      detail: "every line parses (pass --catalog to check targets)",
     });
   });
 });

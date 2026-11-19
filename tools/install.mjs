@@ -56,7 +56,7 @@ const USAGE =
 // Codex manifest names, with its pinned digest.
 function pluginFacts(root) {
   const plugin = join(root, "plugins/pstack");
-  const { roles, tiers } = readJson(join(plugin, "models.json"));
+  const { roles, tiers, retired } = readJson(join(plugin, "models.json"));
   const hooks = readJson(join(plugin, ".codex-plugin/plugin.json")).hooks.replace(/^\.\//, "");
   const skills = readdirSync(join(plugin, "skills"), { withFileTypes: true }).filter((entry) => entry.isDirectory());
   return {
@@ -65,6 +65,7 @@ function pluginFacts(root) {
     codexHook: { path: hooks, sha256: readJson(join(root, FROZEN_HOOKS))[`plugins/pstack/${hooks}`].sha256 },
     roles,
     tiers,
+    retired,
   };
 }
 
@@ -123,7 +124,7 @@ async function run(argv, env, home) {
   } catch (err) {
     report.sheet.checks.push(check("move", false, err.message, hint));
   }
-  report.sheet.checks.push(...doctorSheet(sheet, homes, { catalog, roles: facts.roles, tiers: facts.tiers, hint }));
+  report.sheet.checks.push(...doctorSheet(sheet, homes, { catalog, roles: facts.roles, tiers: facts.tiers, retired: facts.retired, hint }));
   const all = [...report.homes.flatMap((row) => row.checks), ...report.sheet.checks];
   report.failed = all.filter((c) => !c.ok && !c.warn).length;
   report.warnings = all.filter((c) => !c.ok && c.warn).length;

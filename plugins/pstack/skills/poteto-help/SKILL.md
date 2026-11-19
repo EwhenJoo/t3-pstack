@@ -45,7 +45,7 @@ If cost is the worry, say where the tokens go and how to spend fewer. pstack spe
 
 t3-pstack is pstack rewritten for T3 Code, and it installs in Claude Code and Codex with `npx -y github:chhoumann/t3-pstack install`.
 
-Its workflow skills, including `/poteto-mode`, `/how`, `/why`, and `/teach`, dispatch subagents through T3's `delegate_task` with per-role models, so those parts need a T3 thread.
+Its workflow skills, including `/poteto-mode`, `/how`, and `/teach`, dispatch subagents through T3's `delegate_task`, some with per-role models, so those parts need a T3 thread.
 
 ## Start a task with `/poteto-mode`
 

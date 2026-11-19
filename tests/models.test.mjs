@@ -37,7 +37,7 @@ describe("parseModels", () => {
   };
   const role = (policy, label) => policy.roles.find((r) => r.role === label);
 
-  test.each(["default", "strongest", "panel"])("a missing %s tier throws naming it", (tier) => {
+  test.each(["default", "strongest", "fast", "panel"])("a missing %s tier throws naming it", (tier) => {
     expect(parse((p) => delete p.tiers[tier])).toThrow(`models.json: tiers has no "${tier}"`);
   });
 
@@ -55,7 +55,7 @@ describe("parseModels", () => {
 
   test("a single-model tier holds one entry and the panel a list of two families", () => {
     expect(parse((p) => (p.tiers.default = [p.tiers.default]))).toThrow('models.json: tier "default" must be one entry, not a list');
-    expect(parse((p) => (p.tiers.panel = ["claudeAgent/claude-opus-5-5", "claudeAgent/claude-fable-5-1"]))).toThrow(
+    expect(parse((p) => (p.tiers.panel = ["claudeAgent/claude-opus-5-5", "codex_pool/claude-sonnet-5-5"]))).toThrow(
       "models.json: the panel needs at least two model families",
     );
     expect(parse((p) => (p.tiers.panel = ["codex/gpt-6.1-sol", "codex/gpt-6.1-sol"]))).toThrow(
@@ -70,22 +70,27 @@ describe("parseModels", () => {
   });
 
   test("a duplicate role label or alias throws naming it", () => {
-    expect(parse((p) => p.roles.push({ ...role(p, "how explorer") }))).toThrow('models.json: role "how explorer" appears twice');
+    expect(parse((p) => p.roles.push({ ...role(p, "swarm workers") }))).toThrow('models.json: role "swarm workers" appears twice');
     expect(parse((p) => (role(p, "bug-fix").alias = "strongest judgment"))).toThrow(
       'models.json: role "strongest judgment" appears twice',
     );
   });
 
   test("a role whose skill directory does not exist throws naming both", () => {
-    expect(parse(() => {}, (skill) => skill !== "why")).toThrow(
-      'models.json: role "why investigators" names skill "why", which has no SKILL.md',
+    expect(parse(() => {}, (skill) => skill !== "swarm")).toThrow(
+      'models.json: role "swarm workers" names skill "swarm", which has no SKILL.md',
     );
+  });
+
+  test("a retired label that is still a role throws, so a live line is never skipped", () => {
+    expect(parse((p) => p.retired.push("swarm workers"))).toThrow('models.json: "swarm workers" is both a role and retired');
+    expect(parse((p) => delete p.retired)).toThrow('models.json: "retired" must be a list');
   });
 });
 
 describe("role labels reach the prose", () => {
-  // The prose may hyphenate a label ("how-explorer" for the sheet's
-  // "how explorer") and names only the first segment of a comma-joined label.
+  // The prose may hyphenate a label ("swarm-workers" for the sheet's
+  // "swarm workers") and names only the first segment of a comma-joined label.
   const normalize = (text) => text.toLowerCase().replace(/[-\s]+/g, " ");
 
   function skillProse(skill) {

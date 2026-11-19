@@ -43,11 +43,23 @@
           ]
         },
         {
+          "id": "claude-fable-5-2",
+          "options": [{ "id": "effort", "values": ["low", "medium", "high", "xhigh", "max", "ultrathink"] }]
+        },
+        {
           "id": "claude-fable-5-1",
           "options": [{ "id": "effort", "type": "select", "options": [{ "id": "low" }, { "id": "medium" }, { "id": "high" }, { "id": "xhigh" }, { "id": "max" }] }]
         },
         { "id": "claude-haiku-4-5", "options": [{ "id": "thinking", "type": "boolean" }] }
       ],
+      "canRunChildTask": true,
+      "canRunCrossProviderChildTask": true,
+      "constraints": []
+    },
+    {
+      "providerInstanceId": "antigravity",
+      "driverKind": "antigravity",
+      "models": [{ "id": "gemini-4-carbon", "options": [{ "id": "thinking_level", "values": ["low", "medium", "high"] }] }],
       "canRunChildTask": true,
       "canRunCrossProviderChildTask": true,
       "constraints": []
