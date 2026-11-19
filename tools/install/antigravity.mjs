@@ -4,7 +4,7 @@
 // discovers a plugin at <profile>/config/plugins/<dir>. `agy plugin install`
 // writes ~/.gemini whatever GEMINI_HOME says, so the installer copies the
 // plugin tree into each profile itself.
-import { cpSync, existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { check, pluginIntact, readJson, tempBeside } from "./common.mjs";
@@ -15,6 +15,13 @@ const DIR = "t3-pstack";
 
 const installPath = (home) => join(home.dir, "config", "plugins", DIR);
 const installedVersion = (path) => (existsSync(join(path, ANTIGRAVITY_MANIFEST)) ? readJson(join(path, ANTIGRAVITY_MANIFEST)).version : undefined);
+// The session-start hook's files: the hooks file agy reads, its script, and
+// what the script reads. A copy routes as released only while each matches
+// the plugin this run installs.
+const HOOK_FILES = ["hooks.json", "hooks/session-start.sh", "hooks/session-start-context.md", "skills/setup-pstack/scripts/read-sheet.sh"];
+const intact = (path, pluginRoot, skills) =>
+  pluginIntact(path, ANTIGRAVITY_MANIFEST, skills) &&
+  HOOK_FILES.every((file) => existsSync(join(path, file)) && readFileSync(join(path, file)).equals(readFileSync(join(pluginRoot, file))));
 // config.json wins over the manifest wherever it has an entry, and the
 // manifest ships the plugin on.
 const enabled = (home) => {
@@ -25,7 +32,7 @@ const enabled = (home) => {
 export function installAntigravity(home, { pluginRoot, version, skills }) {
   const path = installPath(home);
   const before = installedVersion(path);
-  if (before === version && pluginIntact(path, ANTIGRAVITY_MANIFEST, skills)) return [];
+  if (before === version && intact(path, pluginRoot, skills)) return [];
   // T3 creates the profile private, and keeps it so when it starts the instance.
   mkdirSync(home.dir, { recursive: true, mode: 0o700 });
   mkdirSync(dirname(path), { recursive: true });
@@ -37,19 +44,19 @@ export function installAntigravity(home, { pluginRoot, version, skills }) {
   if (old) renameSync(path, old);
   renameSync(fresh, path);
   if (old) rmSync(old, { recursive: true, force: true });
-  return [before === undefined ? `installed ${version}` : before === version ? `reinstalled ${version}, whose files were missing` : `updated ${before} to ${version}`];
+  return [before === undefined ? `installed ${version}` : before === version ? `reinstalled ${version}, whose files were missing or changed` : `updated ${before} to ${version}`];
 }
 
-export function doctorAntigravity(home, { version, skills, hint }) {
+export function doctorAntigravity(home, { pluginRoot, version, skills, hint }) {
   const path = installPath(home);
   const installed = installedVersion(path);
-  const whole = pluginIntact(path, ANTIGRAVITY_MANIFEST, skills);
+  const whole = intact(path, pluginRoot, skills);
   const on = enabled(home);
   return [
     check(
       "installed",
       installed === version && whole,
-      !installed ? "not installed" : installed !== version ? `${installed}, expected ${version}` : whole ? installed : `${installed}, but its files at ${path} are missing`,
+      !installed ? "not installed" : installed !== version ? `${installed}, expected ${version}` : whole ? installed : `${installed}, but its files at ${path} are missing or changed`,
       hint,
     ),
     check("enabled", on, on ? "yes" : `no, ${join(home.dir, "config", "config.json")} turns it off`, `turn t3-pstack on in that file's "plugins" map`),

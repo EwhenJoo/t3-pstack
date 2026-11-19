@@ -667,9 +667,27 @@ describe("Antigravity", () => {
     const home = antigravityHome();
     installAntigravity(home, agy);
     rmSync(join(installedAt(home), "skills/how"), { recursive: true });
-    expect(doctorAntigravity(home, agy)[0]).toMatchObject({ ok: false, detail: `${shipped}, but its files at ${installedAt(home)} are missing` });
-    expect(installAntigravity(home, agy)).toEqual([`reinstalled ${shipped}, whose files were missing`]);
+    expect(doctorAntigravity(home, agy)[0]).toMatchObject({ ok: false, detail: `${shipped}, but its files at ${installedAt(home)} are missing or changed` });
+    expect(installAntigravity(home, agy)).toEqual([`reinstalled ${shipped}, whose files were missing or changed`]);
     expect(existsSync(join(installedAt(home), "skills/how/SKILL.md"))).toBe(true);
+  });
+
+  test("reinstalls a copy whose session-start hook files are missing or changed", () => {
+    const remove = (path) => rmSync(path);
+    const change = (path) => writeFileSync(path, "changed\n");
+    for (const [file, damage] of [
+      ["hooks.json", remove],
+      ["hooks/session-start.sh", remove],
+      ["hooks/session-start-context.md", change],
+      ["skills/setup-pstack/scripts/read-sheet.sh", remove],
+    ]) {
+      const home = antigravityHome();
+      installAntigravity(home, agy);
+      damage(join(installedAt(home), file));
+      expect(doctorAntigravity(home, agy)[0]).toMatchObject({ ok: false, detail: `${shipped}, but its files at ${installedAt(home)} are missing or changed` });
+      expect(installAntigravity(home, agy)).toEqual([`reinstalled ${shipped}, whose files were missing or changed`]);
+      expect(readFileSync(join(installedAt(home), file))).toEqual(readFileSync(join(pluginRoot, file)));
+    }
   });
 
   test("creates a profile T3 has not started yet, private as T3 keeps it", () => {
