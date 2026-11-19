@@ -728,8 +728,8 @@ describe.skipIf(!enabled || !resolveCli("kiro-cli"))("the installer, on a Kiro h
   }, 300_000);
 
   // As T3 starts Kiro (packages/provider-kiro/src/server/adapter.ts). A dummy key opens a session
-  // without an account, and with no prompt the session stays open until Kiro lists its skills.
-  async function kiroSkills(kiroHome) {
+  // without an account, and with no prompt it stays open until Kiro lists its skills and hooks.
+  async function kiroSession(kiroHome) {
     const child = spawn(kiroCli, ["acp", "--agent-engine=v3", "--auth-method=cli"], {
       cwd: root,
       env: { ...process.env, KIRO_HOME: kiroHome, KIRO_API_KEY: "t3-pstack-e2e" },
@@ -739,12 +739,14 @@ describe.skipIf(!enabled || !resolveCli("kiro-cli"))("the installer, on a Kiro h
     const send = (message) => child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
     const replies = new Map();
     const updates = [];
+    let hooks;
     let partial = "";
     child.stdout.on("data", (chunk) => {
       const lines = (partial + chunk).split("\n");
       partial = lines.pop();
       for (const message of lines.filter(Boolean).map((line) => JSON.parse(line))) {
         if (message.method === "session/update") updates.push(message.params.update);
+        else if (message.method === "_kiro/hooks/didChange") hooks = message.params.hooks;
         else if (message.method && message.id !== undefined) send({ id: message.id, error: { code: -32601, message: "unsupported" } });
         else if (!message.method) replies.get(message.id)?.(message);
       }
@@ -770,26 +772,29 @@ describe.skipIf(!enabled || !resolveCli("kiro-cli"))("the installer, on a Kiro h
         clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false, _meta: { kiro: { hooks: { enabled: true, v2: true } } } },
       });
       await request("session/new", { cwd: root, mcpServers: [] });
-      await until(() => skills.every((name) => listed().has(name)), 60_000);
-      return listed();
+      await until(() => hooks && skills.every((name) => listed().has(name)), 60_000);
+      return { listed: listed(), hooks: hooks ?? [] };
     } finally {
       child.kill();
       await exited;
     }
   }
 
-  test("a Kiro session lists every plugin skill and loads the hooks file without a warning", async () => {
+  test("a Kiro session lists every plugin skill, and registers the hook whose command prints the routing text", async () => {
     const kiroHome = join(home, ".kiro-t3");
-    const listed = await kiroSkills(kiroHome);
+    const { listed, hooks } = await kiroSession(kiroHome);
     expect(skills.filter((name) => !listed.has(name))).toEqual([]);
-    const log = readdirSync(join(kiroHome, "logs")).flatMap((stamp) =>
-      readFileSync(join(kiroHome, "logs", stamp, "kiro.log"), "utf8")
-        .split("\n")
-        .filter(Boolean)
-        .map((line) => JSON.parse(line)),
+    const ours = hooks.filter((hook) => hook._meta?.filePath === join(kiroHome, "hooks/t3-pstack.json"));
+    expect(ours.map(({ action, _meta }) => ({ type: action.type, trigger: _meta.trigger, enabled: _meta.enabled, standing: _meta.kiro?.resource?.standing?.kind }))).toEqual(
+      ["SessionStart", "PostCompact"].map((trigger) => ({ type: "runCommand", trigger, enabled: true, standing: "active" })),
     );
-    expect(log.filter((entry) => entry.level === "warn" && entry.message.includes("hooks/t3-pstack.json"))).toEqual([]);
-    expect(log.map((entry) => entry.message)).toContain('hooks.reload.loaded {"read":2,"registered":2}');
-    console.log("kiro:", JSON.stringify({ skillsListed: listed.size, hooksRegistered: 2 }));
+    // Hook output reaches a model only at its first call, which needs an
+    // account, so the test runs each command as Kiro registered it.
+    for (const { action } of ours) {
+      const r = spawnSync("sh", ["-c", action.command], { cwd: root, env: process.env, encoding: "utf8" });
+      expect({ status: r.status, stderr: r.stderr, routed: r.stdout.includes(ROUTING) }).toEqual({ status: 0, stderr: "", routed: true });
+      expect(r.stdout).toContain(`\`<plugin root>\` is \`${join(kiroHome, "t3-pstack")}\``);
+    }
+    console.log("kiro:", JSON.stringify({ skillsListed: listed.size, hooks: ours.map(({ _meta }) => _meta.trigger) }));
   }, 300_000);
 });
