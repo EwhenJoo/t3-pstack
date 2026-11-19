@@ -1,9 +1,10 @@
-// Antigravity: T3 starts each antigravity instance as `agy acp --gemini-dir
-// <profile>`, where the profile is <T3 userdata>/providers/antigravity/<the
+// Antigravity: T3 starts each antigravity instance on Antigravity CLI 1.5.0 or
+// newer as `<cli> acp --gemini-dir <profile>`, where the profile is <T3 userdata>/providers/antigravity/<the
 // SHA-256 of the instance ID> (apps/server antigravityAuthSupport.ts), and agy
 // discovers a plugin at <profile>/config/plugins/<dir>. `agy plugin install`
 // writes ~/.gemini whatever GEMINI_HOME says, so the installer copies the
-// plugin tree into each profile itself.
+// plugin tree into each profile itself. The older ACP runtime (1.4.x) that
+// earlier T3 releases installed loads no plugins or session-start hooks.
 import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 
