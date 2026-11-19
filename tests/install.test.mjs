@@ -6,6 +6,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
+  cpSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -26,7 +27,7 @@ import { fileURLToPath } from "node:url";
 import { doctorAntigravity, installAntigravity } from "../tools/install/antigravity.mjs";
 import { doctorClaude, installClaude, syncScopedRecords } from "../tools/install/claude.mjs";
 import { AppServer, pinCheck } from "../tools/install/codex.mjs";
-import { parseSource, writeAtomic } from "../tools/install/common.mjs";
+import { npxOrigin, parseSource, writeAtomic } from "../tools/install/common.mjs";
 import { antigravityProfile, discoverHomes } from "../tools/install/homes.mjs";
 import { doctorSheet, moveSheet } from "../tools/install/sheet.mjs";
 
@@ -716,5 +717,45 @@ describe("Antigravity", () => {
     expect(row(run("update")).steps).toEqual([]);
     expect(row(run("doctor")).checks.map((c) => c.name)).toEqual(["installed", "enabled"]);
     expect(existsSync(join(profile, "t3-pstack-models.md"))).toBe(false);
+  });
+});
+
+// npx installs `github:<owner>/<repo>` at <cache>/_npx/<hash>/node_modules/t3-pstack
+// and records the spec in the package.json two levels up.
+describe("npxOrigin", () => {
+  const npxCache = (spec) => {
+    const dir = tmp();
+    const root = join(dir, "node_modules/t3-pstack");
+    mkdirSync(root, { recursive: true });
+    if (spec !== undefined) writeJson(join(dir, "package.json"), { dependencies: { "t3-pstack": spec }, _npx: { packages: [spec] } });
+    return root;
+  };
+
+  test("names the GitHub repository npx fetched, with or without a ref", () => {
+    expect(npxOrigin(npxCache("github:p4cs-974/t3-pstack"))).toBe("p4cs-974/t3-pstack");
+    expect(npxOrigin(npxCache("github:p4cs-974/t3-pstack#v2.5.0"))).toBe("p4cs-974/t3-pstack");
+    expect(npxOrigin(npxCache("chhoumann/t3-pstack"))).toBe("chhoumann/t3-pstack");
+  });
+
+  test("names nothing for a checkout, a registry spec, or a cache without a record", () => {
+    expect(npxOrigin(repoRoot)).toBeUndefined();
+    expect(npxOrigin(npxCache("^2.4.0"))).toBeUndefined();
+    expect(npxOrigin(npxCache("git+https://example.com/x/t3-pstack.git"))).toBeUndefined();
+    expect(npxOrigin(npxCache(undefined))).toBeUndefined();
+  });
+
+  test("a fork's installer installs from that fork with no --source, and doctor passes it", () => {
+    const user = tmp();
+    const bin = join(user, "bin");
+    mkdirSync(bin);
+    symlinkSync(spawnSync("node", ["-p", "process.execPath"], { encoding: "utf8" }).stdout.trim(), join(bin, "node"));
+    const root = npxCache("github:someone/t3-pstack");
+    for (const path of ["tools", "plugins"]) cpSync(join(repoRoot, path), join(root, path), { recursive: true });
+    const r = spawnSync(join(bin, "node"), [join(root, "tools/install.mjs"), "doctor", "--json"], {
+      cwd: user,
+      env: { PATH: `${bin}:/usr/bin:/bin`, HOME: user },
+      encoding: "utf8",
+    });
+    expect(JSON.parse(r.stdout).source).toBe("someone/t3-pstack");
   });
 });

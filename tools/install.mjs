@@ -8,8 +8,9 @@
 // it starts refreshes a Git marketplace, as any T3 Codex thread does. Both
 // exit 1 when a check fails.
 //
-// Each home's t3-pstack marketplace must come from chhoumann/t3-pstack or from
-// this run's --source. A home whose marketplace has another source, such as a
+// Each home's t3-pstack marketplace must come from chhoumann/t3-pstack, from
+// the repository npx fetched this installer from, or from this run's
+// --source, which defaults to that repository. A home whose marketplace has another source, such as a
 // local --source from an earlier run, gets nothing installed and no hook
 // trusted, and doctor fails it with that source. A run never switches a
 // home's source: one from chhoumann/t3-pstack stays on it under another
@@ -24,7 +25,7 @@
 // of the plugin this run installs, so it too changes only when `update` runs.
 //
 //   npx -y github:chhoumann/t3-pstack <install|update|doctor>
-//     --source <owner/repo|git URL|dir>   marketplace source, default chhoumann/t3-pstack
+//     --source <owner/repo|git URL|dir>   marketplace source, default the repo npx ran, else chhoumann/t3-pstack
 //     --claude-home <dir>, --codex-home <dir>   more homes, repeatable
 //     --catalog <file>   an orchestrator_capabilities dump to check the sheet's targets against
 //     --json
@@ -38,7 +39,7 @@ import { parseArgs } from "node:util";
 import { doctorAntigravity, installAntigravity } from "./install/antigravity.mjs";
 import { doctorClaude, installClaude } from "./install/claude.mjs";
 import { doctorCodex, installCodex } from "./install/codex.mjs";
-import { check, hasCli, HOME_REPO, installHint, parseSource, readJson } from "./install/common.mjs";
+import { check, hasCli, HOME_REPO, installHint, npxOrigin, parseSource, readJson } from "./install/common.mjs";
 import { discoverHomes } from "./install/homes.mjs";
 import { doctorSheet, moveSheet, sheetPath } from "./install/sheet.mjs";
 import { FROZEN_HOOKS } from "./plugin.mjs";
@@ -90,9 +91,11 @@ async function run(argv, env, home) {
   const [command] = positionals;
   if (positionals.length !== 1 || !["install", "update", "doctor"].includes(command)) return { usage: true };
 
-  const source = parseSource(values.source ?? HOME_REPO, home);
-  const facts = pluginFacts(source.local ?? fileURLToPath(new URL("..", import.meta.url)));
-  const trusted = new Set([parseSource(HOME_REPO, home).key, source.key]);
+  const packageRoot = fileURLToPath(new URL("..", import.meta.url));
+  const origin = npxOrigin(packageRoot) ?? HOME_REPO;
+  const source = parseSource(values.source ?? origin, home);
+  const facts = pluginFacts(source.local ?? packageRoot);
+  const trusted = new Set([HOME_REPO, origin].map((repo) => parseSource(repo, home).key).concat(source.key));
   const hint = installHint(source);
   const context = { source, trusted, hint, pluginRoot: facts.pluginRoot, version: facts.version, skills: facts.skills, codexHook: facts.codexHook };
   const { homes, settings } = discoverHomes({
