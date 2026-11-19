@@ -70,7 +70,7 @@ describe("regions", () => {
   test("every skill a role names gets that role's tier default stamped in its Models section", () => {
     const marked = {
       ...models,
-      tiers: { default: "x/marker-default", strongest: "x/marker-strongest", fast: "x/marker-fast", panel: ["a/claude-p", "b/gpt-p"] },
+      tiers: { default: "x/marker-default", fast: "x/marker-fast", panel: ["a/claude-p", "b/gpt-p"], judges: ["c/claude-j", "d/gemini-j"] },
     };
     for (const skill of new Set(models.roles.map((r) => r.skill))) {
       const file = `plugins/pstack/skills/${skill}/SKILL.md`;
@@ -78,9 +78,9 @@ describe("regions", () => {
       for (const role of models.roles.filter((r) => r.skill === skill)) {
         const expected = {
           default: "`x/marker-default`",
-          strongest: "`x/marker-strongest`",
           fast: "`x/marker-fast`",
           panel: "`a/claude-p`, `b/gpt-p`",
+          judges: "`c/claude-j`, `d/gemini-j`",
         }[role.tier];
         expect(stamped).toContain(`- ${role.role}: ${expected}`);
       }
@@ -93,7 +93,7 @@ describe("regions", () => {
     const once = applyRegions(file, text, models, { strict: true });
     expect(once).not.toContain("stale");
     expect(once).toContain("## After\nkeep\n");
-    expect(once).toContain("- swarm workers: `claudeAgent/claude-opus-5-5 effort=high fastMode=true`");
+    expect(once).toContain("- swarm workers: `claudeAgent/claude-opus-5-5 effort=high`");
     expect(applyRegions(file, once, models, { strict: true })).toBe(once);
   });
 
@@ -268,13 +268,14 @@ describe("deriveT3", () => {
     expect(out).toContain("body\n\n## Models\n\nRole defaults on T3, stamped from `plugins/pstack/models.json`.");
     expect(out).toContain("`t3-pstack-models.md`");
     expect(out).toContain("It splits at its first `/`");
-    expect(out.endsWith("- swarm workers: `claudeAgent/claude-opus-5-5 effort=high fastMode=true`\n")).toBe(true);
+    expect(out.endsWith("- swarm workers: `claudeAgent/claude-opus-5-5 effort=high`\n")).toBe(true);
     expect(deriveT3("plugins/pstack/skills/swarm/SKILL.md", out, models)).toBe(out);
   });
 
   test("names the alias a released sheet may still use", () => {
-    const out = deriveT3("plugins/pstack/skills/poteto-mode/SKILL.md", front("", "poteto-mode"), models);
-    expect(out).toContain(`- hardest tasks: \`${models.tiers.strongest}\` (a \`strongest judgment\` line counts as this role)`);
+    const aliased = { ...models, roles: models.roles.map((r) => (r.role === "bug-fix" ? { ...r, alias: "bugfix" } : r)) };
+    const out = deriveT3("plugins/pstack/skills/poteto-mode/SKILL.md", front("", "poteto-mode"), aliased);
+    expect(out).toContain(`- bug-fix: \`${models.tiers.default}\` (a \`bugfix\` line counts as this role)`);
   });
 
   test("a file no region names passes through", () => {

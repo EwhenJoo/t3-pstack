@@ -576,15 +576,26 @@ describe("the model sheet", () => {
     });
   });
 
-  test("doctor passes a sheet that still carries the retired how and why lines", () => {
+  test("doctor passes a sheet that still carries retired lines, and warns that setup-pstack drops them", () => {
     const { homes, sheet } = machine();
     mkdirSync(join(sheet, ".."), { recursive: true });
-    const released = ["bug-fix: claudeAgent/claude-opus-5-5 effort=xhigh", "how explorer: claudeAgent/claude-opus-5-5 effort=medium"];
-    writeFileSync(sheet, `${released.join("\n")}\nwhy synthesizer: claudeAgent/claude-opus-5-5 effort=xhigh\n`);
-    expect(doctorSheet(sheet, homes, { catalog: null, roles, tiers, retired, hint: FIX })[0]).toEqual({
-      name: "machine sheet valid",
-      ok: true,
-      detail: "every line parses (pass --catalog to check targets)",
-    });
+    const released = [
+      "bug-fix: claudeAgent/claude-opus-5-5 effort=xhigh",
+      "how explorer: claudeAgent/claude-opus-5-5 effort=medium",
+      "hardest tasks: claudeAgent/claude-fable-5-2 effort=max",
+      "reflect tooling: claudeAgent/claude-opus-5-5 effort=high fastMode=true",
+    ];
+    writeFileSync(sheet, `${released.join("\n")}\n`);
+    expect(doctorSheet(sheet, homes, { catalog: null, roles, tiers, retired, hint: FIX })).toEqual([
+      { name: "machine sheet valid", ok: true, detail: "every line parses (pass --catalog to check targets)" },
+      { name: "home sheets", ok: true, detail: "none differ from it" },
+      {
+        name: "retired roles",
+        ok: false,
+        detail: 'no skill reads "how explorer", "hardest tasks", "reflect tooling"',
+        fix: "run /t3-pstack:setup-pstack in a T3 thread, which drops them",
+        warn: true,
+      },
+    ]);
   });
 });

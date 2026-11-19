@@ -120,12 +120,12 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
       - name: Test
-        run: bun test watch-pr check-plan.test.ts
+        run: bun test watch-pr
       # Upstream's scripts are not Prettier output, so this checks the port's
       # own TypeScript. Pinned here, not in package.json, so bun.lock stays
       # identical to upstream's.
       - name: Check formatting
-        run: bunx prettier@3.6.2 --check watch-pr/settle.ts watch-pr/settle.test.ts watch-pr/verdicts.test.ts resolve-codex-transcript.ts
+        run: bunx prettier@3.6.2 --check watch-pr/settle.ts watch-pr/settle.test.ts watch-pr/verdicts.test.ts
 
   # The same test step as upstream's validate-plugins.yml, on the Node 22 it
   # uses, the oldest line the statechart launcher runs TypeScript on.
