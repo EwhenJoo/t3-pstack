@@ -8,7 +8,7 @@
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, symlinkSync, unlinkSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 
-import { check, copyCheck, installCopy, isPlainCopy, SESSION_START_FILES, tempBeside, writeAtomic } from "./common.mjs";
+import { check, copyCheck, foreignCopy, installCopy, isPlainCopy, SESSION_START_FILES, tempBeside, writeAtomic } from "./common.mjs";
 
 const MANIFEST = ".claude-plugin/plugin.json";
 const copyPath = (home) => join(home.dir, "t3-pstack");
@@ -110,6 +110,9 @@ function writeHooks(home) {
 export function installKiro(home, context) {
   // Kiro creates its home private.
   mkdirSync(home.dir, { recursive: true, mode: 0o700 });
+  // The links and the hooks file point into the copy, so neither goes in
+  // while another tree holds its path.
+  if (foreignCopy(copyPath(home), MANIFEST)) return [];
   return [...installCopy(copyPath(home), MANIFEST, SESSION_START_FILES, context), ...linkSkills(home, context.skills), ...writeHooks(home)];
 }
 
@@ -138,6 +141,7 @@ function hookCheck(home, hint) {
 }
 
 export function doctorKiro(home, context) {
+  if (foreignCopy(copyPath(home), MANIFEST)) return [copyCheck(copyPath(home), MANIFEST, SESSION_START_FILES, context)];
   const plan = skillPlan(home, context.skills);
   return [
     copyCheck(copyPath(home), MANIFEST, SESSION_START_FILES, context),

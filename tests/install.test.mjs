@@ -741,6 +741,20 @@ describe("Antigravity", () => {
     expect(doctorAntigravity(home, agy).every((c) => c.ok)).toBe(true);
   });
 
+  test("leaves another plugin in the copy's folder as it is, and doctor fails it by name", () => {
+    const home = antigravityHome();
+    const other = installedAt(home);
+    writeJson(join(other, ".antigravity-plugin/plugin.json"), { name: "another-plugin", version: "1.0.0" });
+    expect(installAntigravity(home, agy)).toEqual([]);
+    expect(readdirSync(other)).toEqual([".antigravity-plugin"]);
+    expect(doctorAntigravity(home, agy)[0]).toEqual({
+      name: "installed",
+      ok: false,
+      detail: `${other} is not t3-pstack's copy, since no .antigravity-plugin/plugin.json there names t3-pstack`,
+      fix: `move ${other} out of the way, then ${FIX}`,
+    });
+  });
+
   test("doctor fails a plugin the profile's config turns off, and never edits that config", () => {
     const home = antigravityHome();
     installAntigravity(home, agy);
@@ -877,6 +891,26 @@ describe("Kiro", () => {
     expect(doctorKiro(home, kiro).at(-1)).toEqual({ name: "hook", ok: false, detail: `${path} is not the file this release writes`, fix: FIX });
     expect(installKiro(home, kiro)).toEqual([`rewrote ${path}, which had changed`]);
     expect(doctorKiro(home, kiro).at(-1)).toEqual({ name: "hook", ok: true, detail: path });
+  });
+
+  test("leaves a clone at the copy's path whole, links and hooks nothing into it, and doctor fails it by name", () => {
+    const home = kiroHome();
+    const clone = join(home.dir, "t3-pstack");
+    mkdirSync(join(clone, ".git"), { recursive: true });
+    writeFileSync(join(clone, ".git/HEAD"), "ref: refs/heads/main\n");
+    writeFileSync(join(clone, "README.md"), "# my t3-pstack checkout\n");
+    expect(installKiro(home, kiro)).toEqual([]);
+    expect(readFileSync(join(clone, ".git/HEAD"), "utf8")).toBe("ref: refs/heads/main\n");
+    expect(readFileSync(join(clone, "README.md"), "utf8")).toBe("# my t3-pstack checkout\n");
+    expect(readdirSync(home.dir)).toEqual(["t3-pstack"]);
+    expect(doctorKiro(home, kiro)).toEqual([
+      {
+        name: "installed",
+        ok: false,
+        detail: `${clone} is not t3-pstack's copy, since no .claude-plugin/plugin.json there names t3-pstack`,
+        fix: `move ${clone} out of the way, then ${FIX}`,
+      },
+    ]);
   });
 
   test("the hook file's commands route from a home whose path holds a space and a quote", () => {

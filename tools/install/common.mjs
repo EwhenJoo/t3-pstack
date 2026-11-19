@@ -125,13 +125,18 @@ export const pluginIntact = (root, manifest, skills) =>
 // routes as released only while each matches the plugin this run installs.
 export const SESSION_START_FILES = ["hooks/session-start.sh", "hooks/session-start-context.md", "skills/setup-pstack/scripts/read-sheet.sh"];
 
-const copyVersion = (path, manifest) => (existsSync(join(path, manifest)) ? readJson(join(path, manifest)).version : undefined);
+const copyManifest = (path, manifest) => (existsSync(join(path, manifest)) ? readJson(join(path, manifest)) : undefined);
+const copyVersion = (path, manifest) => copyManifest(path, manifest)?.version;
+// A tree at the copy's path is the installer's to replace only when its
+// manifest names t3-pstack, so a clone or a user's folder there survives.
+export const foreignCopy = (path, manifest) => existsSync(path) && copyManifest(path, manifest)?.name !== "t3-pstack";
 const copyWhole = (path, manifest, hookFiles, { pluginRoot, skills }) =>
   pluginIntact(path, manifest, skills) &&
   hookFiles.every((file) => existsSync(join(path, file)) && readFileSync(join(path, file)).equals(readFileSync(join(pluginRoot, file))));
 
 export function installCopy(path, manifest, hookFiles, context) {
   const { pluginRoot, version } = context;
+  if (foreignCopy(path, manifest)) return [];
   const before = copyVersion(path, manifest);
   if (before === version && copyWhole(path, manifest, hookFiles, context)) return [];
   mkdirSync(dirname(path), { recursive: true });
@@ -148,6 +153,9 @@ export function installCopy(path, manifest, hookFiles, context) {
 
 export function copyCheck(path, manifest, hookFiles, context) {
   const { version, hint } = context;
+  if (foreignCopy(path, manifest)) {
+    return check("installed", false, `${path} is not t3-pstack's copy, since no ${manifest} there names t3-pstack`, `move ${path} out of the way, then ${hint}`);
+  }
   const installed = copyVersion(path, manifest);
   const whole = copyWhole(path, manifest, hookFiles, context);
   return check(
