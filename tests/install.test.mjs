@@ -990,6 +990,27 @@ describe("Kiro", () => {
     expect(existsSync(join(user, ".kiro-work"))).toBe(false);
     expect(readdirSync(user).filter((name) => ["t3-pstack", "skills", "hooks"].includes(name))).toEqual([]);
   });
+
+  test("the installer CLI skips each kiro instance whose KIRO_HOME is a T3 secret, and warns with the --kiro-home fix", () => {
+    const user = tmp();
+    const secret = (variable) => ({ driver: "kiro", environment: [{ name: "KIRO_HOME", value: "", sensitive: true, ...variable }] });
+    const { status, report } = kiroInstaller(user, {
+      kiro_ref: secret({ secret: { provider: "onepassword", reference: "op://vault/kiro/home" } }),
+      kiro_stored: { ...secret({ valueRedacted: true }), enabled: false },
+    })("install");
+    expect(status).toBe(0);
+    expect(report.homes.filter((h) => h.harness === "kiro")).toEqual([]);
+    expect(report.settings.checks).toEqual(
+      ["T3 instance kiro_ref", "T3 instance kiro_stored (disabled)"].map((name) => ({
+        name,
+        ok: false,
+        warn: true,
+        detail: "its KIRO_HOME is a secret, which the installer cannot read, so it skipped that instance",
+        fix: `${localHint} with \`--kiro-home <dir>\`, naming the directory that KIRO_HOME holds`,
+      })),
+    );
+    expect(existsSync(join(user, ".kiro"))).toBe(false);
+  });
 });
 
 // npx installs `github:<owner>/<repo>` at <cache>/_npx/<hash>/node_modules/t3-pstack
