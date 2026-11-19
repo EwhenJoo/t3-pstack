@@ -19,9 +19,9 @@ import { expandHome as expand } from "./common.mjs";
 
 const DRIVERS = { claudeAgent: "claude", codex: "codex", antigravity: "antigravity", kiro: "kiro" };
 const HARNESSES = {
-  claude: { env: "CLAUDE_CONFIG_DIR", home: ".claude", cli: "claude" },
-  codex: { env: "CODEX_HOME", home: ".codex", cli: "codex" },
-  kiro: { env: "KIRO_HOME", home: ".kiro", cli: "kiro-cli" },
+  claude: { env: "CLAUDE_CONFIG_DIR", home: ".claude", cli: "claude", homePath: true },
+  codex: { env: "CODEX_HOME", home: ".codex", cli: "codex", homePath: true },
+  kiro: { env: "KIRO_HOME", home: ".kiro", cli: "kiro-cli", homePath: false },
 };
 
 // T3 keeps its state in `${T3CODE_HOME:-~/.t3}/userdata` (apps/server os-jank.ts and config.ts).
@@ -50,7 +50,7 @@ const trimmed = (text) => text?.trim() || undefined;
 function instanceHome(instance, harness, home) {
   const config = instance.config ?? {};
   const instanceEnv = Object.fromEntries((instance.environment ?? []).map((v) => [v.name, v.value ?? ""]));
-  const dir = trimmed(config.homePath) ?? trimmed(instanceEnv[HARNESSES[harness].env]);
+  const dir = trimmed(HARNESSES[harness].homePath ? config.homePath : undefined) ?? trimmed(instanceEnv[HARNESSES[harness].env]);
   const bin = trimmed(config.binaryPath);
   const shadow = trimmed(config.shadowHomePath);
   return {

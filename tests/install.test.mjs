@@ -128,8 +128,13 @@ describe("discoverHomes", () => {
     const t3 = tmp();
     writeJson(join(t3, "userdata/settings.json"), {
       providerInstances: {
-        kiro: { driver: "kiro", enabled: false },
-        kiro_work: { driver: "kiro", environment: [{ name: "KIRO_HOME", value: "~/.kiro-work" }], config: { binaryPath: "~/bin/kiro-cli" } },
+        // Kiro settings have no home path, so T3 ignores a homePath there.
+        kiro: { driver: "kiro", enabled: false, config: { homePath: "/srv/ignored" } },
+        kiro_work: {
+          driver: "kiro",
+          environment: [{ name: "KIRO_HOME", value: "~/.kiro-work" }],
+          config: { binaryPath: "~/bin/kiro-cli", homePath: "/srv/ignored" },
+        },
       },
       // The configured kiro instance is the one this override turns on.
       projectSettingsOverrides: { web: { providerInstances: { kiro: { enabled: true } } } },
