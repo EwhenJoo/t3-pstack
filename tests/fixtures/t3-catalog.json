@@ -60,8 +60,8 @@
       "providerInstanceId": "antigravity",
       "driverKind": "antigravity",
       "models": [
-        { "id": "gemini-4-neon", "options": [{ "id": "thinking_level", "values": ["low", "medium", "high", "xhigh"] }] },
-        { "id": "gemini-4-carbon", "options": [{ "id": "thinking_level", "values": ["low", "medium", "high"] }] }
+        { "id": "gemini-4-neon", "options": [{ "id": "thought_level", "values": ["low", "medium", "high", "xhigh"] }] },
+        { "id": "gemini-4-carbon", "options": [{ "id": "thought_level", "values": ["low", "medium", "high", "xhigh"] }] }
       ],
       "canRunChildTask": true,
       "canRunCrossProviderChildTask": true,
