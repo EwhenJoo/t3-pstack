@@ -2,6 +2,18 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-T3 rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 2.5.0 - Antigravity threads load t3-pstack, and a fork's installer installs from that fork
+
+T3 threads on the Antigravity provider now load t3-pstack: its skills, its four agents, and the session-start hook that routes work to `poteto-mode`.
+
+**Antigravity is a third host.** `plugins/pstack/.antigravity-plugin/plugin.json` is the plugin's Antigravity manifest, and the generator stamps `VERSION` into it. Antigravity reads a plugin's hooks only from `hooks.json` at the plugin root, so `plugins/pstack/hooks.json` runs `sh ./hooks/session-start.sh antigravity`. That mode wraps the same routing text in Antigravity's `injectSteps` JSON, and prints `{}` when the model sheet turns the hook off. The generator checks the file's shape and that the script it runs exists. Antigravity trusts no hook by hash, so the file has no pin in `tools/frozen-hooks.json`. Neither pinned hooks file changes.
+
+**The installer copies the plugin into each Antigravity profile.** T3 starts each `antigravity` instance as `agy acp --gemini-dir <profile>`, where the profile is `~/.t3/userdata/providers/antigravity/<SHA-256 of the instance ID>`, and links in only the skill folders of `~/.gemini`. `agy plugin install` writes `~/.gemini` whatever `GEMINI_HOME` says, and it converts the Claude Code plugin into a hook that fails on the unset `CLAUDE_PLUGIN_ROOT`. So `install` and `update` copy the plugin they run from into `<profile>/config/plugins/t3-pstack`, swapping the whole tree in by rename, and a second run changes nothing. `doctor` reports the copy's version, missing files, and whether the profile's `config.json` turns the plugin off, which the installer never edits. In a signed-in Antigravity thread on Gemini 4 Neon, the hook's text arrived as a system message, `poteto-mode` was listed from the copy, and T3's tools were there as `mcp_t3-code_delegate_task` and its siblings. Antigravity opens a skill by reading its `SKILL.md` and lists only the skills not marked `disable-model-invocation`, as Claude Code does. The hook runs under `sh`, so on Windows an Antigravity thread gets the skills without the session-start routing.
+
+**A fork's installer installs from that fork.** `--source` used to default to `chhoumann/t3-pstack`, so a home whose marketplace came from a fork got nothing from `npx -y github:<owner>/t3-pstack update` unless the run named that fork again. npx writes the spec it ran into the `package.json` two levels above the package, and the installer now reads the GitHub repository there, trusts it, and makes it the default source. A run from a checkout, or from any other spec, keeps `chhoumann/t3-pstack`.
+
+This release syncs nothing from Lauren's pstack, so all three components stay pinned at cursor/plugins `2f87c85`. This is a minor release, since it adds a host. Run `npx -y github:chhoumann/t3-pstack update` after it, as after every release, so Codex trusts the hook again and each Antigravity profile gets its copy.
+
 ## 2.4.0 - Lauren's `2f87c85`: shorter skills, worker.md, and Opus 5.5 first with no role above xhigh
 
 t3-pstack moves to Lauren Tan's pstack at cursor/plugins `2f87c85` ([pstack #1249](https://github.com/cursor/plugins/pull/1249)) for all three components, and pstack's version moves from 0.15.42 to 0.15.43. Only pstack changed upstream. cursor-team-kit and thermos have no change between `bf0c7cd` and `2f87c85`, and their pins move with pstack's.
