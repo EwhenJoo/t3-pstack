@@ -97,7 +97,7 @@ describe("discoverHomes", () => {
         { harness: "claude", dir: "/srv/claude", from: ["CLAUDE_CONFIG_DIR"], bin: "claude" },
         { harness: "codex", dir: "/data/codex", from: ["--codex-home"], bin: "codex" },
       ],
-      settings: { path: join(t3, "userdata/settings.json"), instances: 6, error: undefined },
+      settings: { path: join(t3, "userdata/settings.json"), instances: 6, error: undefined, secrets: [] },
     });
   });
 
@@ -190,6 +190,7 @@ describe("discoverHomes", () => {
       path: join(t3, "userdata/settings.json"),
       instances: 0,
       error: "invalid JSON",
+      secrets: [],
     });
   });
 
@@ -200,7 +201,7 @@ describe("discoverHomes", () => {
         { harness: "claude", dir: "/home/u/.claude", from: ["default"], bin: "claude" },
         { harness: "codex", dir: "/home/u/.codex", from: ["default"], bin: "codex" },
       ],
-      settings: { path: join(t3, "userdata/settings.json"), instances: 0, error: "not found" },
+      settings: { path: join(t3, "userdata/settings.json"), instances: 0, error: "not found", secrets: [] },
     });
   });
 });

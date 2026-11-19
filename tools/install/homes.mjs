@@ -60,8 +60,11 @@ function kiroHome(value, home) {
   return { dir: resolve(dir) };
 }
 
+// T3 keeps a secret variable's value out of settings.json and resolves it only
+// to start the CLI (apps/server/src/serverSettings.ts persistSettingsSecrets).
 function kiroInstanceHome(instance, home) {
   const variable = (instance.environment ?? []).findLast((v) => v.name === HARNESSES.kiro.env);
+  if (variable?.secret || variable?.valueRedacted === true) return { secret: true };
   const bin = trimmed(instance.config?.binaryPath);
   return { ...kiroHome(variable?.value, home), bin: bin && expand(bin, home) };
 }
@@ -118,7 +121,8 @@ export function discoverHomes({ env, home, claudeHomes = [], codexHomes = [], ki
   const settingsPath = t3SettingsPath(env, home);
   const settings = readT3Settings(settingsPath);
   const found = settingsHomes(settings, settingsPath, home);
-  found.forEach(add);
+  const secrets = found.filter((at) => at.secret).map((at) => at.from);
+  found.filter((at) => !at.secret).forEach(add);
   // A Codex shadow home is T3's auth overlay: its config.toml, plugins, and
   // skills are symlinks into the shared home, which is the one to install into.
   const shadows = new Set(found.map(({ shadow }) => shadow).filter(Boolean));
@@ -134,5 +138,5 @@ export function discoverHomes({ env, home, claudeHomes = [], codexHomes = [], ki
   }
 
   const counted = Object.values(settings.instances).filter((instance) => DRIVERS[instance.driver]).length;
-  return { homes: [...homes.values()], settings: { path: settingsPath, instances: counted, error: settings.error } };
+  return { homes: [...homes.values()], settings: { path: settingsPath, instances: counted, error: settings.error, secrets } };
 }

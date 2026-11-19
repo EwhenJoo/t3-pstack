@@ -111,7 +111,16 @@ async function run(argv, env, home) {
   });
   const catalog = values.catalog ? readJson(values.catalog) : null;
 
-  const report = { command, version: facts.version, source: source.arg, settings, homes: [] };
+  const secretChecks = settings.secrets.map((from) =>
+    check(
+      from,
+      false,
+      "its KIRO_HOME is a secret, which the installer cannot read, so it skipped that instance",
+      `${hint} with \`--kiro-home <dir>\`, naming the directory that KIRO_HOME holds`,
+      true,
+    ),
+  );
+  const report = { command, version: facts.version, source: source.arg, settings: { ...settings, checks: secretChecks }, homes: [] };
   for (const target of homes) {
     const harness = HARNESSES[target.harness];
     const row = { harness: target.harness, dir: target.dir, from: target.from, steps: [], checks: [] };
@@ -140,7 +149,7 @@ async function run(argv, env, home) {
     report.sheet.checks.push(check("move", false, err.message, hint));
   }
   report.sheet.checks.push(...doctorSheet(sheet, sheetHomes, { catalog, roles: facts.roles, tiers: facts.tiers, retired: facts.retired, hint }));
-  const all = [...report.homes.flatMap((row) => row.checks), ...report.sheet.checks];
+  const all = [...secretChecks, ...report.homes.flatMap((row) => row.checks), ...report.sheet.checks];
   report.failed = all.filter((c) => !c.ok && !c.warn).length;
   report.warnings = all.filter((c) => !c.ok && c.warn).length;
   return { report, json: values.json };
@@ -148,7 +157,6 @@ async function run(argv, env, home) {
 
 function render({ command, version, source, settings, homes, sheet, failed, warnings }, home) {
   const lines = [`t3-pstack ${version} from ${source}`];
-  lines.push(`T3 settings: ${settings.path}${settings.error ? ` (${settings.error})` : `, ${settings.instances} Claude Code, Codex, Antigravity, or Kiro instances`}`);
   const section = (title, steps, checks) => {
     lines.push("", title);
     for (const step of steps) lines.push(`  - ${step}`);
@@ -157,6 +165,11 @@ function render({ command, version, source, settings, homes, sheet, failed, warn
       if (!c.ok) lines.push(`        fix: ${c.fix}`);
     }
   };
+  section(
+    `T3 settings: ${settings.path}${settings.error ? ` (${settings.error})` : `, ${settings.instances} Claude Code, Codex, Antigravity, or Kiro instances`}`,
+    [],
+    settings.checks,
+  );
   for (const row of homes) section(`${HARNESSES[row.harness].name}  ${row.dir}  (${row.from.join(", ")})`, row.steps, row.checks);
   section(`Model sheet  ${sheet.path}`, sheet.steps, sheet.checks);
   const changed = [...homes.flatMap((row) => row.steps), ...sheet.steps].length;
