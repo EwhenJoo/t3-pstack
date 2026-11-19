@@ -2,6 +2,34 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-T3 rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 2.5.1 - Lauren's `dd24b67`: the panel's Gemini seat runs at xhigh
+
+t3-pstack moves to Lauren Tan's pstack at cursor/plugins `dd24b67` ([pstack #1284](https://github.com/cursor/plugins/pull/1284)) for all three components, and pstack's version moves from 0.15.44 to 0.15.45. Only pstack changed upstream. cursor-team-kit and thermos have no change between `e58dd04` and `dd24b67`, and their pins move with pstack's.
+
+**What changed upstream.** In Lauren's blind comparison of Gemini 4 Neon at high and at xhigh, both caught every planted flaw, and xhigh found more real problems nobody planted, at about 50% more time per run. Panels are where pstack pays for depth, so the seat moves to xhigh.
+
+- The panel's Gemini seat moves from Gemini 4 Neon at high to Gemini 4 Neon at xhigh, in arena's runners and cross-judge pool, poteto-mode's panel default, and setup-pstack's defaults.
+- setup-pstack treats a saved Neon-at-high panel entry as an old default, like any other Gemini 4 panel entry that is not Neon, and moves it to Neon at xhigh. A Neon entry at any other level is the user's choice and stays.
+- A Gemini 4 Neon panel entry takes its own budget target, xhigh moved by the budget, so `large` keeps xhigh, `medium` writes high, and `small` writes medium. Without it, the `large` budget would set the entry to the panel role's high target, and the next run would migrate it back.
+- poteto-mode's "a Gemini seat never runs above high" becomes "a Gemini seat runs at xhigh unless its line names another level".
+
+**What the port adapted.**
+
+- **The T3 default is `antigravity/gemini-4-neon thinking_level=xhigh`.** `models.json` moves the Gemini entry of the `panel` and `judges` tiers to it, since Lauren's cross-judge pool moves too, so arena's runners and cross-judge pool, interrogate's reviewers, and setup-pstack's step 5 sheet follow. On this Mac, on janus, and on agents-fsn1, `orchestrator_capabilities` with `search: "gemini-4-neon"` lists `gemini-4-neon` under `antigravity` with levels low, medium, high, and xhigh. janus names that option `thinking_level`. This Mac and agents-fsn1 now name it `thought_level`, which no t3-pstack release knows yet. This release keeps `thinking_level`, as 2.4.1 wrote it, and leaves that rename to a change of its own.
+- **The level rules follow Lauren's.** 2.4.1's "A Gemini seat never runs above a `high` reasoning level" now reads "A Gemini seat runs at an `xhigh` reasoning level unless its line names another level". setup-pstack's budget step drops the high cap, says Neon's levels run from `low` to `xhigh` with no `max`, and gives a Neon panel entry its own target, written as `thinking_level=xhigh`, `high`, or `medium` on Antigravity.
+- **The migration keeps the entry's provider instance.** A Neon entry at a `high` reasoning level, or another Gemini 4 panel entry, becomes Gemini 4 Neon at `xhigh` on the same provider instance, such as `antigravity/gemini-4-neon thinking_level=xhigh`, if `orchestrator_capabilities` with `search: "gemini-4-neon"` lists it there, as in 2.4.1.
+- **Substitutions.** The three rules that anchored on Lauren's old Gemini sentences move to her new ones. The poteto-mode Gemini rule is now a literal pattern instead of a regex, so a later change of Lauren's level fails the sync instead of keeping this one. The rule count stays at 139. The poteto-mode and setup-pstack forks stay at 7 and 32 changed lines.
+
+**Verification.**
+
+On macOS 27.0:
+
+- `bun tools/generate.mjs --check` reports 14 generated files current. `GIT_CONFIG_GLOBAL=/dev/null bun test tests/ --timeout 30000` passes 545, skips 56, and fails 0. The installer's end-to-end test passes 18 of 18. `validate-skills` keeps every local link inside the skills tree.
+- The dry run at `dd24b67` passes for all three components, with no undeclared fork and no substitution that matches nothing.
+- With this release installed in throwaway Claude Code and Codex homes, each installed `t3-sheet.mjs` printed `ok: every role line parses and dispatches on this T3` for a copy of this Mac's sheet against this Mac's catalog, and for 2.4.0's Carbon defaults, 2.5.0's Neon-at-high defaults, and the new xhigh defaults against janus's catalog. Against this Mac's catalog, those three default sheets fail on `no option "thinking_level" (has thought_level)`. The 2.5.0 checker prints the same output on all eight runs, and `doctor --catalog` gives the same verdicts.
+
+This is a patch release. No user has to act. The checker gains no rule, so every sheet that passed 2.5.0 on a machine passes 2.5.1 there. A sheet's Neon-at-high panel entries move to xhigh only when the user reruns `/setup-pstack`. A role with no line in the sheet runs on the new xhigh default, and its panel runs take longer. Neither hooks file changes. On Codex, run `npx -y github:chhoumann/t3-pstack update` as after every release.
+
 ## 2.5.0 - Antigravity threads load t3-pstack, and a fork's installer installs from that fork
 
 T3 threads on the Antigravity provider now load t3-pstack: its skills, its four agents, and the session-start hook that routes work to `poteto-mode`.
