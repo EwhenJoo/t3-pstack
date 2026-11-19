@@ -62,10 +62,10 @@ bug-fix: claudeAgent/claude-opus-5-5 effort=xhigh
 perf-issue: claudeAgent/claude-opus-5-5 effort=xhigh
 hillclimb: claudeAgent/claude-opus-5-5 effort=xhigh
 judgment and prose: claudeAgent/claude-opus-5-5 effort=xhigh
-arena runners: claudeAgent/claude-fable-5-2 effort=high, claudeAgent/claude-opus-5-5 effort=high, antigravity/gemini-4-neon thinking_level=high
-arena cross-judge pool: claudeAgent/claude-opus-5-5 effort=high, antigravity/gemini-4-neon thinking_level=high
+arena runners: claudeAgent/claude-fable-5-2 effort=high, claudeAgent/claude-opus-5-5 effort=high, antigravity/gemini-4-neon thinking_level=xhigh
+arena cross-judge pool: claudeAgent/claude-opus-5-5 effort=high, antigravity/gemini-4-neon thinking_level=xhigh
 swarm workers: claudeAgent/claude-opus-5-5 effort=high
-interrogate reviewers: claudeAgent/claude-fable-5-2 effort=high, claudeAgent/claude-opus-5-5 effort=high, antigravity/gemini-4-neon thinking_level=high
+interrogate reviewers: claudeAgent/claude-fable-5-2 effort=high, claudeAgent/claude-opus-5-5 effort=high, antigravity/gemini-4-neon thinking_level=xhigh
 session hook: on
 ```
 
