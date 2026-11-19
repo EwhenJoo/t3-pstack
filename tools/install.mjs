@@ -8,9 +8,9 @@
 // it starts refreshes a Git marketplace, as any T3 Codex thread does. Both
 // exit 1 when a check fails.
 //
-// Each home's t3-pstack marketplace must come from chhoumann/t3-pstack, from
-// the repository npx fetched this installer from, or from this run's
-// --source, which defaults to that repository. A home whose marketplace has another source, such as a
+// Each home's t3-pstack marketplace must come from chhoumann/t3-pstack or
+// from this run's --source, which defaults to the repository npx fetched this
+// installer from. A home whose marketplace has another source, such as a
 // local --source from an earlier run, gets nothing installed and no hook
 // trusted, and doctor fails it with that source. A run never switches a
 // home's source: one from chhoumann/t3-pstack stays on it under another
@@ -95,7 +95,7 @@ async function run(argv, env, home) {
   const origin = npxOrigin(packageRoot) ?? HOME_REPO;
   const source = parseSource(values.source ?? origin, home);
   const facts = pluginFacts(source.local ?? packageRoot);
-  const trusted = new Set([HOME_REPO, origin].map((repo) => parseSource(repo, home).key).concat(source.key));
+  const trusted = new Set([parseSource(HOME_REPO, home).key, source.key]);
   const hint = installHint(source);
   const context = { source, trusted, hint, pluginRoot: facts.pluginRoot, version: facts.version, skills: facts.skills, codexHook: facts.codexHook };
   const { homes, settings } = discoverHomes({

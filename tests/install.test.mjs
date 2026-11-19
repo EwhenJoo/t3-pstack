@@ -758,4 +758,30 @@ describe("npxOrigin", () => {
     });
     expect(JSON.parse(r.stdout).source).toBe("someone/t3-pstack");
   });
+
+  test("a fork's installer run with another --source trusts no marketplace from that fork", () => {
+    const user = tmp();
+    const bin = join(user, "bin");
+    mkdirSync(bin);
+    symlinkSync(spawnSync("node", ["-p", "process.execPath"], { encoding: "utf8" }).stdout.trim(), join(bin, "node"));
+    const claude = fakeClaude();
+    symlinkSync(claude.bin, join(bin, "claude"));
+    writeJson(join(user, ".claude/settings.json"), {
+      extraKnownMarketplaces: { "t3-pstack": { source: { source: "github", repo: "someone/t3-pstack" } } },
+    });
+    const root = npxCache("github:someone/t3-pstack");
+    for (const path of ["tools", "plugins"]) cpSync(join(repoRoot, path), join(root, path), { recursive: true });
+    const r = spawnSync(join(bin, "node"), [join(root, "tools/install.mjs"), "update", "--source", "chhoumann/t3-pstack", "--json"], {
+      cwd: user,
+      env: { PATH: `${bin}:/usr/bin:/bin`, HOME: user },
+      encoding: "utf8",
+    });
+    expect(claude.calls()).toEqual([]);
+    expect(r.status).toBe(1);
+    expect(JSON.parse(r.stdout).homes.find((h) => h.harness === "claude").checks[0]).toMatchObject({
+      name: "marketplace",
+      ok: false,
+      detail: "someone/t3-pstack, which is neither chhoumann/t3-pstack nor --source",
+    });
+  });
 });
