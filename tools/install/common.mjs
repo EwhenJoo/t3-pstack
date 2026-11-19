@@ -1,9 +1,9 @@
-// What the Claude Code and Codex halves of the installer share: the plugin's
-// ids, the marketplace sources it trusts, the CLI runner, file writes, and the
-// shape of a doctor check.
+// What the installer's harnesses share: the plugin's ids, the marketplace
+// sources it trusts, the plugin copy a harness without a marketplace loads,
+// the CLI runner, file writes, and the shape of a doctor check.
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { chmodSync, chownSync, existsSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, chownSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, delimiter, dirname, extname, join, resolve } from "node:path";
 
@@ -120,6 +120,43 @@ export const isPlainCopy = (name, skillFile, skills) =>
 // each skill's SKILL.md.
 export const pluginIntact = (root, manifest, skills) =>
   existsSync(join(root, manifest)) && [...skills.keys()].every((name) => existsSync(join(root, "skills", name, "SKILL.md")));
+
+// The files the session-start hook runs and reads. A copy of the plugin
+// routes as released only while each matches the plugin this run installs.
+export const SESSION_START_FILES = ["hooks/session-start.sh", "hooks/session-start-context.md", "skills/setup-pstack/scripts/read-sheet.sh"];
+
+const copyVersion = (path, manifest) => (existsSync(join(path, manifest)) ? readJson(join(path, manifest)).version : undefined);
+const copyWhole = (path, manifest, hookFiles, { pluginRoot, skills }) =>
+  pluginIntact(path, manifest, skills) &&
+  hookFiles.every((file) => existsSync(join(path, file)) && readFileSync(join(path, file)).equals(readFileSync(join(pluginRoot, file))));
+
+export function installCopy(path, manifest, hookFiles, context) {
+  const { pluginRoot, version } = context;
+  const before = copyVersion(path, manifest);
+  if (before === version && copyWhole(path, manifest, hookFiles, context)) return [];
+  mkdirSync(dirname(path), { recursive: true });
+  // A whole tree swapped in by rename, so a session never loads half a plugin
+  // and files a release dropped do not linger.
+  const fresh = tempBeside(path);
+  cpSync(pluginRoot, fresh, { recursive: true });
+  const old = existsSync(path) ? tempBeside(path) : undefined;
+  if (old) renameSync(path, old);
+  renameSync(fresh, path);
+  if (old) rmSync(old, { recursive: true, force: true });
+  return [before === undefined ? `installed ${version}` : before === version ? `reinstalled ${version}, whose files were missing or changed` : `updated ${before} to ${version}`];
+}
+
+export function copyCheck(path, manifest, hookFiles, context) {
+  const { version, hint } = context;
+  const installed = copyVersion(path, manifest);
+  const whole = copyWhole(path, manifest, hookFiles, context);
+  return check(
+    "installed",
+    installed === version && whole,
+    !installed ? "not installed" : installed !== version ? `${installed}, expected ${version}` : whole ? installed : `${installed}, but its files at ${path} are missing or changed`,
+    hint,
+  );
+}
 
 // Every CLI runs from an empty directory. Claude Code reads `<cwd>/.claude`
 // as project settings, and from the home folder that is the main home's
