@@ -762,7 +762,7 @@ describe("npxOrigin", () => {
     expect(npxOrigin(npxCache(undefined))).toBeUndefined();
   });
 
-  test("a fork's installer installs from that fork with no --source, and doctor passes it", () => {
+  test("a fork's installer defaults --source to that fork", () => {
     const user = tmp();
     const bin = join(user, "bin");
     mkdirSync(bin);
