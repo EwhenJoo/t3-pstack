@@ -5,7 +5,7 @@
 // nothing and fails when a committed copy is stale, so it cannot ship.
 //
 // Sources of truth:
-//   VERSION  -> the "version" field in the Claude Code and Codex manifests,
+//   VERSION  -> the "version" field in the Claude Code, Codex, and Antigravity manifests,
 //               the Claude Code marketplace entry, and package.json
 //   CHANGES.md must carry a heading for the current VERSION (release completeness)
 //   plugins/pstack/models.json (the T3 model policy: tier defaults and roles)
@@ -19,8 +19,9 @@
 //        inside the installed plugin
 //
 // Also validated: skill frontmatter, the skills tree's links,
-// the plugin layout, agent frontmatter, the Codex marketplace, and both hooks
-// files against their pins in tools/frozen-hooks.json.
+// the plugin layout, agent frontmatter, the Codex marketplace, the Claude Code
+// and Codex hooks files against their pins in tools/frozen-hooks.json, and
+// the Antigravity hooks file.
 
 import { execFileSync } from "node:child_process";
 import {
@@ -50,10 +51,13 @@ export { parseFrontmatter };
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const CODEX_MANIFEST = `${PLUGIN}/.codex-plugin/plugin.json`;
+// Antigravity loads hooks only from hooks.json at the plugin root.
+const ANTIGRAVITY_HOOKS = "hooks.json";
 const VERSIONED_MANIFESTS = [
   ".claude-plugin/marketplace.json",
   `${PLUGIN}/.claude-plugin/plugin.json`,
   CODEX_MANIFEST,
+  `${PLUGIN}/.antigravity-plugin/plugin.json`,
   "package.json",
 ];
 
@@ -401,6 +405,32 @@ export function validateHooks(hooksJson, { statOf, file = "hooks/hooks.json", ro
   if (faults.length) throw new Error(`${file}:\n  ${faults.join("\n  ")}`);
 }
 
+// Antigravity's hooks file maps each hook's name to its events, and runs each
+// command with `sh -c` in the plugin root, so the script a command hands to
+// `sh` must exist in the plugin. Antigravity trusts no hook by hash, so the
+// file has no pin.
+const ANTIGRAVITY_HANDLER = Type.Object(
+  { type: Type.Optional(Type.Literal("command")), command: Type.String({ minLength: 1 }), timeout: Type.Optional(Type.Integer({ minimum: 1 })) },
+  { additionalProperties: false },
+);
+const ANTIGRAVITY_HOOKS_FILE = Type.Record(
+  Type.String(),
+  Type.Object({ enabled: Type.Optional(Type.Boolean()), SessionStart: Type.Array(ANTIGRAVITY_HANDLER) }, { additionalProperties: false }),
+);
+
+export function validateAntigravityHooks(hooksJson, { statOf, file = ANTIGRAVITY_HOOKS }) {
+  const raw = JSON.parse(hooksJson);
+  const faults = shapeFaults(ANTIGRAVITY_HOOKS_FILE, raw, "file");
+  for (const [name, spec] of faults.length ? [] : Object.entries(raw)) {
+    for (const { command } of spec.SessionStart) {
+      const script = command.match(/^sh \.\/(\S+)/)?.[1];
+      if (!script) faults.push(`${name}: command does not run a plugin script with sh ./<path>: ${command}`);
+      else if (!statOf(script)) faults.push(`${name}: ${script} does not exist in the plugin`);
+    }
+  }
+  if (faults.length) throw new Error(`${file}:\n  ${faults.join("\n  ")}`);
+}
+
 // Codex trusts a plugin hook by a hash of its entry, and a Git marketplace
 // delivers a new entry at the next app-server start, so a changed hooks file
 // silently stops the hook in every home until the installer trusts it again.
@@ -570,6 +600,7 @@ export function problems(root, models) {
   for (const file of hookFiles) {
     attempt(() => validateHooks(readFileSync(join(pluginRoot, file), "utf8"), { statOf, file }));
   }
+  attempt(() => validateAntigravityHooks(readFileSync(join(pluginRoot, ANTIGRAVITY_HOOKS), "utf8"), { statOf }));
   // A Codex manifest that does not parse names no hooks file to compare.
   if (codex) attempt(() => {
     const paths = hookFiles.map((file) => `${PLUGIN}/${file}`);
