@@ -1,10 +1,11 @@
 // The installer end to end, with the real claude and codex CLIs, in a
 // throwaway HOME that T3's settings file describes. Opt in with
-// T3_PSTACK_E2E=1; it needs both CLIs and takes about a minute. This checkout
-// is the marketplace source. The Codex probe turn has no credentials, so it
-// fails at the model call, after the session-start hook has run.
+// T3_PSTACK_E2E=1; it needs both CLIs and takes about a minute, and its Kiro
+// suite runs when kiro-cli is on PATH. This checkout is the marketplace
+// source. The Codex probe turn has no credentials, so it fails at the model
+// call, after the session-start hook has run.
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   cpSync,
@@ -35,7 +36,7 @@ const SHEET = "# budget: large (xhigh)\nbug-fix: inherit-parent\nsession hook: o
 let root;
 let home;
 const saved = {};
-const ISOLATED = ["HOME", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "T3CODE_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "GIT_CONFIG_GLOBAL"];
+const ISOLATED = ["HOME", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "KIRO_HOME", "T3CODE_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "GIT_CONFIG_GLOBAL"];
 
 function sh(bin, args, env = {}) {
   const r = spawnSync(bin, args, { cwd: root, env: { ...process.env, ...env }, encoding: "utf8" });
@@ -681,5 +682,114 @@ describe.skipIf(!enabled)("the installer, on a Codex home that changes while it 
         '"message":"Configuration was modified since last read. Fetch latest version and retry."}',
     ]);
     expect(await trustState()).toBe(null);
+  }, 300_000);
+});
+
+// A kiro instance in T3's settings, and the real kiro-cli. Only node and
+// kiro-cli are on PATH, so the default Claude Code and Codex homes are skipped.
+describe.skipIf(!enabled || !resolveCli("kiro-cli"))("the installer, on a Kiro home", () => {
+  isolate({ kiro: { driver: "kiro", enabled: true, environment: [{ name: "KIRO_HOME", value: "~/.kiro-t3" }] } });
+  const path = process.env.PATH;
+  const kiroCli = resolveCli("kiro-cli");
+  const skills = readdirSync(join(repoRoot, "plugins/pstack/skills"));
+  const kiroRow = (report) => report.homes.find((h) => h.harness === "kiro");
+
+  beforeAll(() => {
+    const bin = join(root, "bin");
+    mkdirSync(bin);
+    symlinkSync(resolveCli("node"), join(bin, "node"));
+    symlinkSync(kiroCli, join(bin, "kiro-cli"));
+    process.env.PATH = `${bin}${delimiter}/usr/bin${delimiter}/bin`;
+  });
+
+  afterAll(() => {
+    process.env.PATH = path;
+  });
+
+  test("install converges the Kiro home, and every check passes", () => {
+    const { status, report } = installer("install");
+    console.log("kiro install:", JSON.stringify(kiroRow(report).steps));
+    expect(status).toBe(0);
+    expect(kiroRow(report)).toMatchObject({
+      dir: join(home, ".kiro-t3"),
+      from: ["T3 instance kiro"],
+      steps: [`installed ${version}`, `linked ${skills.length} skills`, `wrote ${join(home, ".kiro-t3/hooks/t3-pstack.json")}`],
+    });
+    expect(kiroRow(report).checks.filter((c) => !c.ok)).toEqual([]);
+  }, 300_000);
+
+  test("a second install changes nothing, and doctor passes", () => {
+    const before = snapshot();
+    const { status, report } = installer("update");
+    expect(status).toBe(0);
+    expect(kiroRow(report).steps).toEqual([]);
+    expect(snapshot()).toEqual(before);
+    expect(installer("doctor").status).toBe(0);
+  }, 300_000);
+
+  // As T3 starts Kiro (packages/provider-kiro/src/server/adapter.ts). A dummy key opens a session
+  // without an account, and with no prompt the session stays open until Kiro lists its skills.
+  async function kiroSkills(kiroHome) {
+    const child = spawn(kiroCli, ["acp", "--agent-engine=v3", "--auth-method=cli"], {
+      cwd: root,
+      env: { ...process.env, KIRO_HOME: kiroHome, KIRO_API_KEY: "t3-pstack-e2e" },
+      stdio: ["pipe", "pipe", "ignore"],
+    });
+    const exited = new Promise((resolve) => child.once("exit", resolve));
+    const send = (message) => child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
+    const replies = new Map();
+    const updates = [];
+    let partial = "";
+    child.stdout.on("data", (chunk) => {
+      const lines = (partial + chunk).split("\n");
+      partial = lines.pop();
+      for (const message of lines.filter(Boolean).map((line) => JSON.parse(line))) {
+        if (message.method === "session/update") updates.push(message.params.update);
+        else if (message.method && message.id !== undefined) send({ id: message.id, error: { code: -32601, message: "unsupported" } });
+        else if (!message.method) replies.get(message.id)?.(message);
+      }
+    });
+    let id = 0;
+    const request = (method, params) =>
+      new Promise((resolve, reject) => {
+        replies.set(++id, (reply) => (reply.error ? reject(new Error(`${method}: ${JSON.stringify(reply.error)}`)) : resolve(reply.result)));
+        send({ id, method, params });
+      });
+    const listed = () =>
+      new Set(
+        updates
+          .filter((update) => update.sessionUpdate === "available_commands_update")
+          .flatMap((update) => update.availableCommands)
+          .filter((command) => command._meta?.kiro?.type === "skill")
+          .map((command) => command.name),
+      );
+    try {
+      await request("initialize", {
+        protocolVersion: 1,
+        clientInfo: { name: "t3-code", version: "0.0.0" },
+        clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false, _meta: { kiro: { hooks: { enabled: true, v2: true } } } },
+      });
+      await request("session/new", { cwd: root, mcpServers: [] });
+      await until(() => skills.every((name) => listed().has(name)), 60_000);
+      return listed();
+    } finally {
+      child.kill();
+      await exited;
+    }
+  }
+
+  test("a Kiro session lists every plugin skill and loads the hooks file without a warning", async () => {
+    const kiroHome = join(home, ".kiro-t3");
+    const listed = await kiroSkills(kiroHome);
+    expect(skills.filter((name) => !listed.has(name))).toEqual([]);
+    const log = readdirSync(join(kiroHome, "logs")).flatMap((stamp) =>
+      readFileSync(join(kiroHome, "logs", stamp, "kiro.log"), "utf8")
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line)),
+    );
+    expect(log.filter((entry) => entry.level === "warn" && entry.message.includes("hooks/t3-pstack.json"))).toEqual([]);
+    expect(log.map((entry) => entry.message)).toContain('hooks.reload.loaded {"read":2,"registered":2}');
+    console.log("kiro:", JSON.stringify({ skillsListed: listed.size, hooksRegistered: 2 }));
   }, 300_000);
 });
