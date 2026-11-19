@@ -804,6 +804,23 @@ const entryState = (path) =>
     ? { link: readlinkSync(path) }
     : Object.fromEntries(readdirSync(path, { recursive: true }).map((file) => [file, readFileSync(join(path, file), "utf8")]));
 
+function kiroInstaller(user, providerInstances, env = {}) {
+  const bin = join(user, "bin");
+  mkdirSync(bin);
+  symlinkSync(spawnSync("node", ["-p", "process.execPath"], { encoding: "utf8" }).stdout.trim(), join(bin, "node"));
+  writeFileSync(join(bin, "kiro-cli"), "#!/bin/sh\n", { mode: 0o755 });
+  writeJson(join(user, ".t3/userdata/settings.json"), { providerInstances });
+  return (command) => {
+    const r = spawnSync(join(bin, "node"), [join(repoRoot, "tools/install.mjs"), command, "--source", repoRoot, "--json"], {
+      cwd: user,
+      env: { PATH: `${bin}:/usr/bin:/bin`, HOME: user, ...env },
+      encoding: "utf8",
+    });
+    return { status: r.status, report: JSON.parse(r.stdout) };
+  };
+}
+const localHint = `rerun \`npx -y github:chhoumann/t3-pstack install --source ${resolve(repoRoot)}\``;
+
 describe("Kiro", () => {
   test("copies the plugin into the home, links each skill into the copy, writes the hook file, and a second run changes nothing", () => {
     const home = kiroHome();
@@ -952,6 +969,26 @@ describe("Kiro", () => {
       { name: "skills", ok: true, detail: `${shippedSkills} linked` },
       { name: "hook", ok: true, detail: join(user, "kiro/hooks/t3-pstack.json") },
     ]);
+  });
+
+  test("the installer CLI fills ~/.kiro in place of each KIRO_HOME that Kiro ignores, and warns with each value", () => {
+    const user = tmp();
+    const kiroWork = { driver: "kiro", environment: [{ name: "KIRO_HOME", value: "~/.kiro-work" }] };
+    const { status, report } = kiroInstaller(user, { kiro_work: kiroWork }, { KIRO_HOME: user })("install");
+    expect(status).toBe(0);
+    const rows = report.homes.filter((h) => h.harness === "kiro");
+    expect(rows.map(({ dir, from }) => ({ dir, from }))).toEqual([{ dir: join(user, ".kiro"), from: ["T3 instance kiro_work", "KIRO_HOME"] }]);
+    expect(rows[0].checks.filter((c) => !c.ok)).toEqual([
+      {
+        name: "KIRO_HOME",
+        ok: false,
+        warn: true,
+        detail: `Kiro reads this home, since it ignores "~/.kiro-work" from T3 instance kiro_work, "${user}" from KIRO_HOME`,
+        fix: `make KIRO_HOME an absolute path that does not hold your home folder, or unset it, then ${localHint}`,
+      },
+    ]);
+    expect(existsSync(join(user, ".kiro-work"))).toBe(false);
+    expect(readdirSync(user).filter((name) => ["t3-pstack", "skills", "hooks"].includes(name))).toEqual([]);
   });
 });
 
