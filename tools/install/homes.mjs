@@ -50,13 +50,13 @@ export const antigravityProfile = (settingsPath, id) =>
 const trimmed = (text) => text?.trim() || undefined;
 const real = (path) => (existsSync(path) ? realpathSync(path) : resolve(path));
 
-// kiro-cli compares the paths after `.`, `..`, and symlinks resolve, and logs
-// "ignoring KIRO_HOME" when it falls back to ~/.kiro.
+// kiro-cli collapses `.` and `..`, then resolves symlinks, before it compares
+// the paths, and logs "ignoring KIRO_HOME" when it falls back to ~/.kiro.
 function kiroHome(value, home) {
   const dir = trimmed(value);
   const fallback = join(home, HARNESSES.kiro.home);
   if (!dir) return { dir: fallback };
-  if (!isAbsolute(dir) || join(real(home), sep).startsWith(join(real(dir), sep))) return { dir: fallback, ignored: dir };
+  if (!isAbsolute(dir) || join(real(home), sep).startsWith(join(real(resolve(dir)), sep))) return { dir: fallback, ignored: dir };
   return { dir: resolve(dir) };
 }
 
