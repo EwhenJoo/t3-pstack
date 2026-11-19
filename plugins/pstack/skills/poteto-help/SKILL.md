@@ -35,7 +35,7 @@ When the model sheet is missing and it matters, ask whether the user wants to pi
 
 ## Get set up
 
-1. Install t3-pstack per its [README](https://github.com/chhoumann/t3-pstack#readme). One `npx -y github:chhoumann/t3-pstack install` run installs it in every Claude Code, Codex, and Kiro config home T3 can run.
+1. Install t3-pstack per its [README](https://github.com/chhoumann/t3-pstack#readme). One `npx -y github:chhoumann/t3-pstack install` run installs it in every home T3 can run.
 2. Run [`/setup-pstack`](../setup-pstack/SKILL.md). It asks for a reasoning budget, maps a T3 provider and model to each role, and writes the model sheet. The sheet applies to new chats. Then it offers once each to generate a verification skill and a formal verification skill for the project, unless the project already has one.
 3. Start a real task with `/poteto-mode`, a goal, and a check that can pass or fail.
 
@@ -43,7 +43,7 @@ Installing changes nothing until the user invokes a skill. Only `/setup-pstack` 
 
 If cost is the worry, say where the tokens go and how to spend fewer. pstack spends extra tokens on subagents and review panels. Rerun `/setup-pstack` and pick a smaller budget or cheaper models. A role set to `auto` or `inherit-parent` runs on the chat's model, which saves tokens when the chat runs on a cheaper model. A shorter panel list runs fewer subagents, one for each entry. Save `/poteto-mode` for work that needs rigor.
 
-t3-pstack is pstack rewritten for T3 Code, and it installs in Claude Code, Codex, and Kiro with `npx -y github:chhoumann/t3-pstack install`.
+t3-pstack is pstack rewritten for T3 Code, and `npx -y github:chhoumann/t3-pstack install` installs it in every home T3 can run.
 
 Its workflow skills, including `/poteto-mode`, `/how`, and `/teach`, dispatch subagents through T3's `delegate_task`, some with per-role models, so those parts need a T3 thread.
 
