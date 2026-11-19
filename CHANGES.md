@@ -2,6 +2,35 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-T3 rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 2.4.1 - Lauren's `e58dd04`: the panel's Gemini seat moves to Gemini 4 Neon
+
+t3-pstack moves to Lauren Tan's pstack at cursor/plugins `e58dd04` ([pstack #1283](https://github.com/cursor/plugins/pull/1283)) for all three components, and pstack's version moves from 0.15.43 to 0.15.44. Only pstack changed upstream. cursor-team-kit and thermos have no change between `2f87c85` and `e58dd04`, and their pins move with pstack's.
+
+**What changed upstream.**
+
+- The panel's Gemini seat moves from Gemini 4 Carbon to Gemini 4 Neon at high, in arena's runners and cross-judge pool, poteto-mode's panel default, and setup-pstack's defaults.
+- setup-pstack treats every saved `gemini-4-*` panel entry other than Neon as an old default, in any sheet, moves it to Neon at high, and tells the user which entries it replaced.
+- Gemini 4 Neon has an xhigh level, but a Gemini entry stays at high when its role targets xhigh, and a Gemini seat never runs above high.
+
+**What the port adapted.**
+
+- **The T3 default is `antigravity/gemini-4-neon thinking_level=high`.** `models.json` moves the Gemini entry of the `panel` and `judges` tiers to it, so arena's runners and cross-judge pool, interrogate's reviewers, and setup-pstack's step 5 sheet follow. On this Mac, on janus, and on agents-fsn1, `orchestrator_capabilities` with `search: "gemini-4-neon"` lists `gemini-4-neon` under `antigravity`, with `thinking_level` low, medium, high, and xhigh.
+- **The migration keeps the entry's provider instance.** Lauren's paragraph reads that each such entry becomes Gemini 4 Neon at `high` on the same provider instance, such as `antigravity/gemini-4-neon thinking_level=high`, if `orchestrator_capabilities` with `search: "gemini-4-neon"` lists it there. Neon on another provider instance can bill differently, and OpenCode's short list omits Neon, so the check searches.
+- **The xhigh cap applies as Lauren wrote it.** setup-pstack's budget step reads "Gemini 4 Neon offers an `xhigh` level, but a Gemini entry stays at `high` when its role's target is `xhigh`." Its "Antigravity lists no speed option for Gemini 4 Carbon" becomes "no provider lists a speed option for a Gemini model, so never write one", which holds for Neon on Antigravity and on OpenCode. poteto-mode's "A Gemini seat never runs above `gemini-4-neon-high`" reads "A Gemini seat never runs above a `high` reasoning level", which covers `thinking_level` on Antigravity and `variant` on OpenCode.
+- **setup-pstack validates against every model the sheet names.** Step 4 checked the candidate against a fresh `orchestrator_capabilities` result, whose list is short. OpenCode's lists 9 of its 441 models, so a valid `opencode/openrouter/google/gemini-4-neon variant=high` line failed `t3-sheet.mjs` with `"opencode" does not list model "openrouter/google/gemini-4-neon"`. Step 4 now adds to each provider's `models` every model the candidate or the defaults name that the short list omits, as `search` with that model's ID returns it.
+- **Substitutions.** The two rules that anchored on Lauren's old Gemini sentences move to her new ones, and one new rule carries her Neon migration paragraph. The rule count moves from 138 to 139. The poteto-mode and setup-pstack forks stay at 7 and 32 changed lines.
+
+**Verification.**
+
+On macOS 27.0:
+
+- `bun tools/generate.mjs --check` passes. `GIT_CONFIG_GLOBAL=/dev/null bun test tests/ --timeout 30000` passes 508, skips 56, and fails 0, as 2.4.0 did. The installer's end-to-end test passes 18 of 18. `validate-skills` keeps every local link inside the skills tree.
+- The dry run at `e58dd04` passes for all three components, with no undeclared fork and no substitution that matches nothing.
+- Against this Mac's short `orchestrator_capabilities` list, `t3-sheet.mjs` fails a sheet with three OpenCode Neon panel entries on each of them, and passes it once the catalog carries the model that `search` returned, as step 4 now builds it.
+- With this release installed in throwaway Claude Code and Codex homes, each installed `t3-sheet.mjs` printed `ok: every role line parses and dispatches on this T3` and exited 0 against this Mac's catalog for 2.4.0's default sheet, with its three `antigravity/gemini-4-carbon` panel entries, for a sheet with the new Neon defaults, and for a copy of this Mac's sheet. `doctor --catalog` reported "machine sheet valid" for each.
+
+This is a patch release. No user has to act. Antigravity still lists Gemini 4 Carbon, so every sheet that passed 2.4.0 still passes, and a sheet's Carbon panel entries move to Neon only when the user reruns `/setup-pstack`. A role with no line in the sheet runs on the new Neon default. Neither hooks file changes. On Codex, run `npx -y github:chhoumann/t3-pstack update` as after every release.
+
 ## 2.4.0 - Lauren's `2f87c85`: shorter skills, worker.md, and Opus 5.5 first with no role above xhigh
 
 t3-pstack moves to Lauren Tan's pstack at cursor/plugins `2f87c85` ([pstack #1249](https://github.com/cursor/plugins/pull/1249)) for all three components, and pstack's version moves from 0.15.42 to 0.15.43. Only pstack changed upstream. cursor-team-kit and thermos have no change between `bf0c7cd` and `2f87c85`, and their pins move with pstack's.
