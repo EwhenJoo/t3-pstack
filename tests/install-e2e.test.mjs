@@ -687,8 +687,11 @@ describe.skipIf(!enabled)("the installer, on a Codex home that changes while it 
 
 // A kiro instance in T3's settings, and the real kiro-cli. Only node and
 // kiro-cli are on PATH, so the default Claude Code and Codex homes are skipped.
+// T3 passes the instance's KIRO_HOME as written, and kiro-cli ignores a
+// relative one and reads ~/.kiro.
 describe.skipIf(!enabled || !resolveCli("kiro-cli"))("the installer, on a Kiro home", () => {
-  isolate({ kiro: { driver: "kiro", enabled: true, environment: [{ name: "KIRO_HOME", value: "~/.kiro-t3" }] } });
+  const instanceKiroHome = "~/.kiro-t3";
+  isolate({ kiro: { driver: "kiro", enabled: true, environment: [{ name: "KIRO_HOME", value: instanceKiroHome }] } });
   const path = process.env.PATH;
   const kiroCli = resolveCli("kiro-cli");
   const skills = readdirSync(join(repoRoot, "plugins/pstack/skills"));
@@ -706,16 +709,19 @@ describe.skipIf(!enabled || !resolveCli("kiro-cli"))("the installer, on a Kiro h
     process.env.PATH = path;
   });
 
-  test("install converges the Kiro home, and every check passes", () => {
+  test("install converges ~/.kiro, the home Kiro reads, and warns only of the KIRO_HOME it ignores", () => {
     const { status, report } = installer("install");
     console.log("kiro install:", JSON.stringify(kiroRow(report).steps));
     expect(status).toBe(0);
     expect(kiroRow(report)).toMatchObject({
-      dir: join(home, ".kiro-t3"),
+      dir: join(home, ".kiro"),
       from: ["T3 instance kiro"],
-      steps: [`installed ${version}`, `linked ${skills.length} skills`, `wrote ${join(home, ".kiro-t3/hooks/t3-pstack.json")}`],
+      steps: [`installed ${version}`, `linked ${skills.length} skills`, `wrote ${join(home, ".kiro/hooks/t3-pstack.json")}`],
     });
-    expect(kiroRow(report).checks.filter((c) => !c.ok)).toEqual([]);
+    expect(kiroRow(report).checks.filter((c) => !c.ok).map((c) => ({ name: c.name, warn: c.warn, detail: c.detail }))).toEqual([
+      { name: "KIRO_HOME", warn: true, detail: `Kiro reads this home, since it ignores "${instanceKiroHome}" from T3 instance kiro` },
+    ]);
+    expect(existsSync(join(home, ".kiro-t3"))).toBe(false);
   }, 300_000);
 
   test("a second install changes nothing, and doctor passes", () => {
@@ -780,9 +786,9 @@ describe.skipIf(!enabled || !resolveCli("kiro-cli"))("the installer, on a Kiro h
     }
   }
 
-  test("a Kiro session lists every plugin skill, and registers the hook whose command prints the routing text", async () => {
-    const kiroHome = join(home, ".kiro-t3");
-    const { listed, hooks } = await kiroSession(kiroHome);
+  test("a Kiro session on the instance's KIRO_HOME lists every plugin skill, and registers the hook whose command prints the routing text", async () => {
+    const kiroHome = join(home, ".kiro");
+    const { listed, hooks } = await kiroSession(instanceKiroHome);
     expect(skills.filter((name) => !listed.has(name))).toEqual([]);
     const ours = hooks.filter((hook) => hook._meta?.filePath === join(kiroHome, "hooks/t3-pstack.json"));
     expect(ours.map(({ action, _meta }) => ({ type: action.type, trigger: _meta.trigger, enabled: _meta.enabled, standing: _meta.kiro?.resource?.standing?.kind }))).toEqual(

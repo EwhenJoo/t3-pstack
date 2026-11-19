@@ -140,10 +140,21 @@ function hookCheck(home, hint) {
   return check("hook", ok, ok ? path : text === undefined ? `${path} is missing` : `${path} is not the file this release writes`, hint);
 }
 
+const ignoredCheck = (ignored, hint) =>
+  check(
+    "KIRO_HOME",
+    false,
+    `Kiro reads this home, since it ignores ${ignored.map(({ value, from }) => `"${value}" from ${from}`).join(", ")}`,
+    `make KIRO_HOME an absolute path that does not hold your home folder, or unset it, then ${hint}`,
+    true,
+  );
+
 export function doctorKiro(home, context) {
-  if (foreignCopy(copyPath(home), MANIFEST)) return [copyCheck(copyPath(home), MANIFEST, SESSION_START_FILES, context)];
+  const warnings = home.ignored ? [ignoredCheck(home.ignored, context.hint)] : [];
+  if (foreignCopy(copyPath(home), MANIFEST)) return [...warnings, copyCheck(copyPath(home), MANIFEST, SESSION_START_FILES, context)];
   const plan = skillPlan(home, context.skills);
   return [
+    ...warnings,
     copyCheck(copyPath(home), MANIFEST, SESSION_START_FILES, context),
     skillsCheck(plan, context.skills, context.hint),
     ...plan.collisions.map((entry) => collisionCheck(entry, context.hint)),

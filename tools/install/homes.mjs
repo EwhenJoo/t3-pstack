@@ -8,20 +8,22 @@
 // else the instance's CLAUDE_CONFIG_DIR or CODEX_HOME, else the default. T3
 // expands a leading `~` in the first two and in `config.binaryPath`
 // (provider-core pathExpansion.ts). Kiro settings have no home path
-// (packages/provider-kiro/src/settings.ts), so a kiro instance's home is its
-// KIRO_HOME, else ~/.kiro, and T3 runs its `config.binaryPath`, else kiro-cli
-// (packages/provider-kiro/src/server/acpSupport.ts and driver.ts).
+// (packages/provider-kiro/src/settings.ts), and T3 passes a kiro instance's
+// KIRO_HOME as written (provider-core instanceEnvironment.ts), so its home is
+// the one kiro-cli makes of that value: the value when it is absolute and does
+// not hold the home folder, else ~/.kiro. T3 runs its `config.binaryPath`,
+// else kiro-cli (packages/provider-kiro/src/server/acpSupport.ts and driver.ts).
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 
 import { expandHome as expand } from "./common.mjs";
 
 const DRIVERS = { claudeAgent: "claude", codex: "codex", antigravity: "antigravity", kiro: "kiro" };
 const HARNESSES = {
-  claude: { env: "CLAUDE_CONFIG_DIR", home: ".claude", cli: "claude", homePath: true },
-  codex: { env: "CODEX_HOME", home: ".codex", cli: "codex", homePath: true },
-  kiro: { env: "KIRO_HOME", home: ".kiro", cli: "kiro-cli", homePath: false },
+  claude: { env: "CLAUDE_CONFIG_DIR", home: ".claude", cli: "claude" },
+  codex: { env: "CODEX_HOME", home: ".codex", cli: "codex" },
+  kiro: { env: "KIRO_HOME", home: ".kiro", cli: "kiro-cli" },
 };
 
 // T3 keeps its state in `${T3CODE_HOME:-~/.t3}/userdata` (apps/server os-jank.ts and config.ts).
@@ -46,11 +48,29 @@ export const antigravityProfile = (settingsPath, id) =>
   join(dirname(settingsPath), "providers", "antigravity", createHash("sha256").update(id).digest("hex"));
 
 const trimmed = (text) => text?.trim() || undefined;
+const real = (path) => (existsSync(path) ? realpathSync(path) : resolve(path));
+
+// kiro-cli compares the paths after `.`, `..`, and symlinks resolve, and logs
+// "ignoring KIRO_HOME" when it falls back to ~/.kiro.
+function kiroHome(value, home) {
+  const dir = trimmed(value);
+  const fallback = join(home, HARNESSES.kiro.home);
+  if (!dir) return { dir: fallback };
+  if (!isAbsolute(dir) || join(real(home), sep).startsWith(join(real(dir), sep))) return { dir: fallback, ignored: dir };
+  return { dir: resolve(dir) };
+}
+
+function kiroInstanceHome(instance, home) {
+  const variable = (instance.environment ?? []).findLast((v) => v.name === HARNESSES.kiro.env);
+  const bin = trimmed(instance.config?.binaryPath);
+  return { ...kiroHome(variable?.value, home), bin: bin && expand(bin, home) };
+}
 
 function instanceHome(instance, harness, home) {
+  if (harness === "kiro") return kiroInstanceHome(instance, home);
   const config = instance.config ?? {};
   const instanceEnv = Object.fromEntries((instance.environment ?? []).map((v) => [v.name, v.value ?? ""]));
-  const dir = trimmed(HARNESSES[harness].homePath ? config.homePath : undefined) ?? trimmed(instanceEnv[HARNESSES[harness].env]);
+  const dir = trimmed(config.homePath) ?? trimmed(instanceEnv[HARNESSES[harness].env]);
   const bin = trimmed(config.binaryPath);
   const shadow = trimmed(config.shadowHomePath);
   return {
@@ -83,12 +103,13 @@ function settingsHomes({ instances, overrides }, settingsPath, home) {
 // null for an Antigravity profile, which the installer writes without one.
 export function discoverHomes({ env, home, claudeHomes = [], codexHomes = [], kiroHomes = [] }) {
   const homes = new Map();
-  const add = ({ harness, dir, from, bin }) => {
-    const key = `${harness}\0${existsSync(dir) ? realpathSync(dir) : dir}`;
+  const add = ({ harness, dir, from, bin, ignored }) => {
+    const key = `${harness}\0${real(dir)}`;
     const cli = HARNESSES[harness]?.cli ?? null;
     const entry = homes.get(key) ?? { harness, dir, from: [], bin: cli };
     entry.from.push(from);
     if (bin && entry.bin === cli) entry.bin = bin;
+    if (ignored) (entry.ignored ??= []).push({ value: ignored, from });
     homes.set(key, entry);
   };
 
@@ -102,8 +123,10 @@ export function discoverHomes({ env, home, claudeHomes = [], codexHomes = [], ki
   // skills are symlinks into the shared home, which is the one to install into.
   const shadows = new Set(found.map(({ shadow }) => shadow).filter(Boolean));
   for (const [harness, { env: variable }] of Object.entries(HARNESSES)) {
-    const dir = trimmed(env[variable]);
-    if (dir && !shadows.has(resolve(dir))) add({ harness, dir: resolve(dir), from: variable });
+    const value = trimmed(env[variable]);
+    if (!value) continue;
+    const at = harness === "kiro" ? kiroHome(value, home) : { dir: resolve(value) };
+    if (!shadows.has(at.dir)) add({ harness, from: variable, ...at });
   }
   const flagged = { claude: claudeHomes, codex: codexHomes, kiro: kiroHomes };
   for (const [harness, dirs] of Object.entries(flagged)) {

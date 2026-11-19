@@ -132,7 +132,7 @@ describe("discoverHomes", () => {
         kiro: { driver: "kiro", enabled: false, config: { homePath: "/srv/ignored" } },
         kiro_work: {
           driver: "kiro",
-          environment: [{ name: "KIRO_HOME", value: "~/.kiro-work" }],
+          environment: [{ name: "KIRO_HOME", value: "/home/u/.kiro-work" }],
           config: { binaryPath: "~/bin/kiro-cli", homePath: "/srv/ignored" },
         },
       },
