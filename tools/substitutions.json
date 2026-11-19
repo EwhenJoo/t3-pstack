@@ -62,7 +62,7 @@
     },
     {
       "pattern": "1. Install with `/add-plugin pstack` in chat, or from Customize in the sidebar.",
-      "replacement": "1. Install t3-pstack per its [README](https://github.com/chhoumann/t3-pstack#readme). One `npx -y github:chhoumann/t3-pstack install` run installs it in every Claude Code and Codex config home T3 can run.",
+      "replacement": "1. Install t3-pstack per its [README](https://github.com/chhoumann/t3-pstack#readme). One `npx -y github:chhoumann/t3-pstack install` run installs it in every Claude Code, Codex, and Kiro config home T3 can run.",
       "rationale": "Cursor's install UI does not exist on T3 (Per-skill notes: poteto-help)",
       "files": "^skills/poteto-help/SKILL\\.md$"
     },
@@ -92,13 +92,13 @@
     },
     {
       "pattern": "pstack is built for Cursor, and it also installs in Claude Code with `/plugin marketplace add cursor/plugins`, then `/plugin install pstack@cursor-plugins`. There, each command takes a `pstack:` prefix, such as `/pstack:poteto-mode`. The [Claude Code adapter](../../docs/harness/claude-code.md) maps the Cursor names, and a step that needs a Cursor-only feature, such as Bugbot or Automations, is skipped with a one-line note.\n\nOther tools can read the skills, because they use the Agent Skills format. But most workflow skills, including `/poteto-mode`, `/how`, and `/teach`, spawn Cursor subagents, some with per-role models, and Custom Modes and `/loop` are Cursor features, so those parts may not work there.",
-      "replacement": "t3-pstack is pstack rewritten for T3 Code, and it installs in Claude Code and Codex with `npx -y github:chhoumann/t3-pstack install`.\n\nIts workflow skills, including `/poteto-mode`, `/how`, and `/teach`, dispatch subagents through T3's `delegate_task`, some with per-role models, so those parts need a T3 thread.",
+      "replacement": "t3-pstack is pstack rewritten for T3 Code, and it installs in Claude Code, Codex, and Kiro with `npx -y github:chhoumann/t3-pstack install`.\n\nIts workflow skills, including `/poteto-mode`, `/how`, and `/teach`, dispatch subagents through T3's `delegate_task`, some with per-role models, so those parts need a T3 thread.",
       "rationale": "states where the port runs and how it installs (Precedence)",
       "files": "^skills/poteto-help/SKILL\\.md$"
     },
     {
       "pattern": "- Enter on `/poteto-mode` attaches the skill to one message. It fades as the chat moves on.\n- Option+Enter on Mac or Alt+Enter on Windows, or Use as Mode from the skill entry, makes it a Custom Mode. It stays in context every turn until the user exits the mode, and it stays out of casual turns.\n- Cursor's docs list Custom Modes in the Agents Window and the CLI. Elsewhere, start each new task with `/poteto-mode`.",
-      "replacement": "- Invoking `/poteto-mode` attaches the skill to one message. It fades as the chat moves on, so start each new task with it.\n- Where the harness runs t3-pstack's session-start hook, each new chat is told when to enter `/poteto-mode` on its own.\n- Skill names differ by harness: `/t3-pstack:poteto-mode` on Claude Code, `$t3-pstack:poteto-mode` on Codex. This file writes every skill as `/<name>`.",
+      "replacement": "- Invoking `/poteto-mode` attaches the skill to one message. It fades as the chat moves on, so start each new task with it.\n- Where the harness runs t3-pstack's session-start hook, each new chat is told when to enter `/poteto-mode` on its own.\n- Skill names differ by harness: `/t3-pstack:poteto-mode` on Claude Code, `$t3-pstack:poteto-mode` on Codex, and `/poteto-mode` on Kiro. This file writes every skill as `/<name>`.",
       "rationale": "harness-specific invocation (Per-skill notes: poteto-help)",
       "files": "^skills/poteto-help/SKILL\\.md$"
     },
@@ -336,7 +336,7 @@
     },
     {
       "pattern": "With no path, before any other work, search `~/.cursor/plugins/` for a file whose path ends in `skills/poteto-mode/SKILL.md`. If more than one file matches, use the copy whose `.cursor-plugin/plugin.json` has the highest `version`.",
-      "replacement": "With no path, before any other work, search the harness's plugin directory (`~/.claude/plugins/` on Claude Code, `${CODEX_HOME:-~/.codex}/plugins/` on Codex) for a file whose path ends in `skills/poteto-mode/SKILL.md`. If more than one file matches, use the copy whose plugin manifest (`.claude-plugin/plugin.json` or `.codex-plugin/plugin.json`) has the highest `version`.",
+      "replacement": "With no path, before any other work, search the harness's plugin directory (`~/.claude/plugins/` on Claude Code, `${CODEX_HOME:-~/.codex}/plugins/` on Codex, and `${KIRO_HOME:-~/.kiro}/t3-pstack/` on Kiro) for a file whose path ends in `skills/poteto-mode/SKILL.md`. If more than one file matches, use the copy whose plugin manifest (`.claude-plugin/plugin.json` or `.codex-plugin/plugin.json`) has the highest `version`.",
       "rationale": "harness-specific plugin paths",
       "files": "^agents/poteto-agent\\.md$"
     },
@@ -500,7 +500,7 @@
     },
     {
       "pattern": "Look recursively for `.cursor/skills/**/*-mode/SKILL.md` and `~/.cursor/skills/*-mode/SKILL.md` matching the user's handle. Mode skills can live in a personal category directory (`.cursor/skills/<handle>/`), not only at the top level. If one exists, confirm intent with `AskQuestion`",
-      "replacement": "Look recursively for `*-mode/SKILL.md` in the project's and the user's skills directories (`.claude/skills/` and `~/.claude/skills/` on Claude Code, `.agents/skills/` and `~/.agents/skills/` on Codex and most other harnesses) matching the user's handle. Mode skills can live in a personal category directory (`<skills dir>/<handle>/`), not only at the top level. If one exists, confirm intent with a multiple-choice question (`AskUserQuestion` on Claude Code, numbered options in plain text elsewhere)",
+      "replacement": "Look recursively for `*-mode/SKILL.md` in the project's and the user's skills directories (`.claude/skills/` and `~/.claude/skills/` on Claude Code, `.kiro/skills/` and `~/.kiro/skills/` on Kiro, `.agents/skills/` and `~/.agents/skills/` on Codex and most other harnesses) matching the user's handle. Mode skills can live in a personal category directory (`<skills dir>/<handle>/`), not only at the top level. If one exists, confirm intent with a multiple-choice question (`AskUserQuestion` on Claude Code, numbered options in plain text elsewhere)",
       "rationale": "harness-specific skill dirs and question tool"
     },
     {
@@ -525,7 +525,7 @@
     },
     {
       "pattern": "For a new mode, use `.cursor/skills/<handle>/<handle>-mode/SKILL.md` when the repo has an established personal category for that handle. Otherwise default to `.cursor/skills/<handle>-mode/SKILL.md` in the project (or `~/.cursor/skills/<handle>-mode/` if the user prefers a personal skill).",
-      "replacement": "For a new mode, use `<skills dir>/<handle>/<handle>-mode/SKILL.md` when the repo has an established personal category for that handle. Otherwise default to `<skills dir>/<handle>-mode/SKILL.md` in the project, or in the user's skills directory if the user prefers a personal skill. `<skills dir>` is `.claude/skills` on Claude Code and `.agents/skills` elsewhere.",
+      "replacement": "For a new mode, use `<skills dir>/<handle>/<handle>-mode/SKILL.md` when the repo has an established personal category for that handle. Otherwise default to `<skills dir>/<handle>-mode/SKILL.md` in the project, or in the user's skills directory if the user prefers a personal skill. `<skills dir>` is `.claude/skills` on Claude Code, `.kiro/skills` on Kiro, and `.agents/skills` elsewhere.",
       "rationale": "harness-specific skill dirs"
     },
     {
@@ -535,7 +535,7 @@
     },
     {
       "pattern": "(`.cursor/skills/verify-<app>/`)",
-      "replacement": "(`<skills dir>/verify-<app>/`, where `<skills dir>` is `.claude/skills` on Claude Code and `.agents/skills` elsewhere)",
+      "replacement": "(`<skills dir>/verify-<app>/`, where `<skills dir>` is `.claude/skills` on Claude Code, `.kiro/skills` on Kiro, and `.agents/skills` elsewhere)",
       "rationale": "harness-specific skill dirs"
     },
     {
@@ -545,7 +545,7 @@
     },
     {
       "pattern": "(usually `.cursor/skills/verify-*/`)",
-      "replacement": "(usually `.claude/skills/verify-*/` on Claude Code or `.agents/skills/verify-*/` elsewhere)",
+      "replacement": "(usually `.claude/skills/verify-*/` on Claude Code, `.kiro/skills/verify-*/` on Kiro, or `.agents/skills/verify-*/` elsewhere)",
       "rationale": "harness-specific skill dirs"
     },
     {
