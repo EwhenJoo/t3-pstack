@@ -4,7 +4,7 @@
     "pstack": {
       "upstreamPath": "pstack",
       "localPath": "plugins/pstack",
-      "sha": "2f87c854fe3e2fcda44ca86b46ede35aad3c46b7",
+      "sha": "e58dd043600587dbaf58ba315e7f2b38373eeb43",
       "exclude": [
         ".cursor-plugin/",
         ".gitignore",
@@ -20,7 +20,7 @@
     "cursor-team-kit": {
       "upstreamPath": "cursor-team-kit/skills",
       "localPath": "plugins/pstack/skills",
-      "sha": "2f87c854fe3e2fcda44ca86b46ede35aad3c46b7",
+      "sha": "e58dd043600587dbaf58ba315e7f2b38373eeb43",
       "exclude": [
         "check-compiler-errors/",
         "control-cli/",
@@ -39,7 +39,7 @@
     "thermos": {
       "upstreamPath": "thermos",
       "localPath": "plugins/pstack",
-      "sha": "2f87c854fe3e2fcda44ca86b46ede35aad3c46b7",
+      "sha": "e58dd043600587dbaf58ba315e7f2b38373eeb43",
       "exclude": [
         ".cursor-plugin/",
         "CHANGELOG.md",

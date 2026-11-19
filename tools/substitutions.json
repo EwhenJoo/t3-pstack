@@ -1,16 +1,22 @@
 {
   "substitutions": [
     {
+      "pattern": "Older Gemini models held the panel seat before Gemini 4 Neon. So in any rule, a `gemini-4-*` entry other than `gemini-4-neon-*` in a panel role (`arena runners`, `arena cross-judge pool`, `interrogate reviewers`) is an old default. Each one becomes `gemini-4-neon-high`. Tell the user which entries you replaced.",
+      "files": "^skills/setup-pstack/SKILL\\.md$",
+      "replacement": "Older Gemini models held the panel seat before Gemini 4 Neon. So in any sheet, an entry whose model ID's last `/` part matches `gemini-4-*`, other than Gemini 4 Neon, in a panel role (`arena runners`, `arena cross-judge pool`, `interrogate reviewers`) is an old default. Each one becomes Gemini 4 Neon at `high` on the same provider instance, such as `antigravity/gemini-4-neon thinking_level=high`, if `orchestrator_capabilities` with `search: \"gemini-4-neon\"` lists it there. Tell the user which entries you replaced.",
+      "rationale": "The sheet: upstream's move of old Gemini panel entries to Gemini 4 Neon, in T3 entries. An entry keeps its provider instance, since Neon on another instance can bill differently, so it moves only where that instance lists Neon. OpenCode's short capabilities list omits Neon, so the check searches"
+    },
+    {
       "pattern": "A rule without the `# defaults: 3` line comes from an older setup. That setup wrote a line for every role, so some of its values are old defaults, not choices. Before step 3, replace these values:\n\n- An `arena cross-judge pool` list of exactly one `claude-fable-*` entry, one `claude-opus-*` entry, and one `gemini-*` entry, in any order, takes the role's step 5 list. Fable and Opus are one vendor, so the Fable entry could judge only where the Opus entry also could.\n- A `# budget: unlimited` line becomes `large`, because no role runs above `xhigh`.\n- If the rule has no `# defaults: 2` line either, an old slug is one that matches `grok-*`. An old slug in `feature, refactoring`, `bug-fix`, `perf-issue`, `hillclimb`, or `swarm workers` takes the role's step 5 default. In a panel role (`arena runners`, `arena cross-judge pool`, `interrogate reviewers`), a list of exactly one `claude-opus-*` entry and one old slug, in either order, takes the role's step 5 list. In any other list, each old slug becomes `claude-opus-5-5-high-fast`.\n\nEvery other value is the user's choice and stays, including an old slug in any other role and every `inherit-parent` or `auto` value.",
       "files": "^skills/setup-pstack/SKILL\\.md$",
       "replacement": "A sheet without the `# defaults: 3` line comes from an older setup. That setup wrote a line for every role, so some of its values are old defaults, not choices. Before step 3, replace these values:\n\n- An `arena cross-judge pool` list of exactly one Fable entry (`claude-fable-*`), one Opus entry (`claude-opus-*`), and one Gemini entry (`gemini-*`), with any provider instance and options, in any order, takes the role's step 5 list. Fable and Opus are one vendor, so the Fable entry could judge only where the Opus entry also could.\n- A `# budget: unlimited` line becomes `large`, because no role runs above `xhigh`.\n- If the sheet has no `# defaults: 2` line either, each of these values takes the role's step 5 default:\n  - `claudeAgent/claude-fable-5-1`, with any options, in `bug-fix`, `perf-issue`, or `hillclimb`.\n  - `claudeAgent/claude-opus-5-5`, with any options, in `swarm workers`.\n  - In a panel role (`arena runners`, `arena cross-judge pool`, `interrogate reviewers`), a list of exactly `claudeAgent/claude-opus-5-5`, `codex/gpt-6.1-sol`, and `grok/grok-4.7`, with any options, in any order.\n\nEvery other value is the user's choice and stays, including every `inherit-parent` or `auto` value.",
       "rationale": "The sheet: upstream's migration of old defaults in T3 entries. The `# defaults: 2` branch matches the defaults t3-pstack 2.0 through 2.2 wrote, since a T3 sheet never held a Cursor slug, so a Grok entry outside that three-entry panel stays"
     },
     {
-      "pattern": "So `medium` turns `claude-opus-5-5-xhigh-fast` into `claude-opus-5-5-high-fast` and `claude-opus-5-5-high-fast` into `claude-opus-5-5-medium-fast`, and `small` turns them into `claude-opus-5-5-medium-fast` and `claude-opus-5-5-low-fast`. Opus 5.5 always runs its `-fast` slug, so every Opus 5.5 value ends in `-fast`. Fable 5.2 and Gemini have no fast slug, so never write one. Gemini tops out at `high`, so a Gemini entry runs at `high` when its role's target is `xhigh`.",
+      "pattern": "So `medium` turns `claude-opus-5-5-xhigh-fast` into `claude-opus-5-5-high-fast` and `claude-opus-5-5-high-fast` into `claude-opus-5-5-medium-fast`, and `small` turns them into `claude-opus-5-5-medium-fast` and `claude-opus-5-5-low-fast`. Opus 5.5 always runs its `-fast` slug, so every Opus 5.5 value ends in `-fast`. Fable 5.2 and Gemini have no fast slug, so never write one. Gemini 4 Neon has an `xhigh` slug, but a Gemini entry stays at `high` when its role's target is `xhigh`.",
       "files": "^skills/setup-pstack/SKILL\\.md$",
-      "replacement": "So `medium` turns `effort=xhigh` into `effort=high` and `effort=high` into `effort=medium`, and `small` turns them into `effort=medium` and `effort=low`. Opus 5.5 runs at standard speed, so never write `fastMode`, which on T3 is a priced fast mode. Claude lists no `fastMode` for Fable 5.2, and Antigravity lists no speed option for Gemini 4 Carbon. Gemini 4 Carbon's `thinking_level` tops out at `high`, so a Gemini entry runs at `high` when its role's target is `xhigh`.",
-      "rationale": "The sheet: a T3 entry carries its reasoning as an option, not a slug suffix. Cursor's -fast slug maps to the plain T3 model, because Claude's fastMode is a priced fast mode, not the same thing"
+      "replacement": "So `medium` turns `effort=xhigh` into `effort=high` and `effort=high` into `effort=medium`, and `small` turns them into `effort=medium` and `effort=low`. Opus 5.5 runs at standard speed, so never write `fastMode`, which on T3 is a priced fast mode. Claude lists no `fastMode` for Fable 5.2, and no provider lists a speed option for a Gemini model, so never write one. Gemini 4 Neon offers an `xhigh` level, but a Gemini entry stays at `high` when its role's target is `xhigh`.",
+      "rationale": "The sheet: a T3 entry carries its reasoning as an option, not a slug suffix. Cursor's -fast slug maps to the plain T3 model, because Claude's fastMode is a priced fast mode, not the same thing. Antigravity and OpenCode list only a reasoning option for their Gemini models"
     },
     {
       "pattern": "with `alwaysApply: true`, the `# defaults: 3` line,",
@@ -287,10 +293,10 @@
       "rationale": "Model names: T3 defaults live in models.json"
     },
     {
-      "regex": "A Gemini seat never runs above `gemini-[^`]+`, its top slug\\.",
+      "regex": "A Gemini seat never runs above `gemini-[^`]+`\\.",
       "files": "^skills/poteto-mode/SKILL\\.md$",
-      "replacement": "A Gemini seat never runs above `thinking_level=high`, the top level Antigravity lists for Gemini 4 Carbon.",
-      "rationale": "The sheet: Gemini 4 Carbon's level is Antigravity's thinking_level option, not a slug suffix"
+      "replacement": "A Gemini seat never runs above a `high` reasoning level.",
+      "rationale": "The sheet: a Gemini entry's level is its provider's reasoning option (thinking_level on Antigravity, variant on OpenCode), not a slug suffix"
     },
     {
       "pattern": "If the Task tool rejects a slug, never pass it again. Fall back to the role's line or default, then the calling skill's fallback, then the closest valid slug of the same family, then omit `model`.",
