@@ -120,7 +120,7 @@ describe("checkSheet against a catalog", () => {
     const problems = (lines) => check(lines.join("\n"), values);
     const missingDefault = (p) =>
       p.includes('(no line, tier default): claudeAgent/claude-fable-5-2: "claudeAgent" does not list model "claude-fable-5-2"') ||
-      p.includes('(no line, tier default): antigravity/gemini-4-carbon: no provider instance "antigravity" in this T3');
+      p.includes('(no line, tier default): antigravity/gemini-4-neon: no provider instance "antigravity" in this T3');
     const valid = [
       "bug-fix: claudeAgent/claude-opus-5-5 effort=high fastMode=true",
       "feature, refactoring: codex/gpt-6.1-sol reasoningEffort=xhigh serviceTier=priority",
@@ -156,7 +156,7 @@ describe("checkSheet against a catalog", () => {
     const panelRoles = roles.filter((r) => Array.isArray(defaults[r.tier])).map((r) => r.role);
     expect(check("session hook: on", noGemini)).toEqual(
       panelRoles.map(
-        (role) => `${role} (no line, tier default): antigravity/gemini-4-carbon: no provider instance "antigravity" in this T3`,
+        (role) => `${role} (no line, tier default): antigravity/gemini-4-neon: no provider instance "antigravity" in this T3`,
       ),
     );
     const lines = panelRoles.map((role) => `${role}: claudeAgent/claude-opus-5-5, codex/gpt-6.1-sol`).join("\n");

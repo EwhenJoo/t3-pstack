@@ -17,7 +17,7 @@ Call `orchestrator_capabilities`, or `acp-mcp-call orchestrator_capabilities '{}
 
 The default role-to-target mapping is the sheet shape in step 5 below. If the sheet already exists, read it and treat its `# budget` line and its role values as the current choices. If it does not, read `t3-pstack-models.md` in the host's config directory (`$CLAUDE_CONFIG_DIR` or `~/.claude` on Claude Code, `$CODEX_HOME` or `~/.codex` on Codex), where releases before 2.0.0-rc.3 kept the sheet, the same way. Otherwise start from those defaults. A line whose role is not in step 5, such as `hardest tasks`, `architect runners`, `reflect tooling`, or `why investigators`, is from a retired role. Drop it. Also drop any value that is not a T3 entry, such as a bare family name, a `claude-` slug, or an `@<level>` suffix, and a `default effort` line.
 
-Older Gemini models held the panel seat before Gemini 4 Neon. So in any sheet, an entry whose model ID's last `/` part matches `gemini-4-*`, other than Gemini 4 Neon, in a panel role (`arena runners`, `arena cross-judge pool`, `interrogate reviewers`) is an old default. Each one becomes the Gemini 4 Neon model on the same provider instance, at `high` with that provider's reasoning option, when `orchestrator_capabilities` with `search: "gemini-4-neon"` lists one there. Otherwise the entry stays, since Gemini 4 Neon on another provider instance can bill differently. Tell the user which entries you replaced.
+Older Gemini models held the panel seat before Gemini 4 Neon. So in any sheet, an entry whose model ID's last `/` part matches `gemini-4-*`, other than Gemini 4 Neon, in a panel role (`arena runners`, `arena cross-judge pool`, `interrogate reviewers`) is an old default. Each one becomes Gemini 4 Neon at `high` on the same provider instance, such as `antigravity/gemini-4-neon thinking_level=high`, if `orchestrator_capabilities` with `search: "gemini-4-neon"` lists it there. Tell the user which entries you replaced.
 
 A sheet without the `# defaults: 3` line comes from an older setup. That setup wrote a line for every role, so some of its values are old defaults, not choices. Before step 3, replace these values:
 
@@ -46,7 +46,7 @@ Every other value is the user's choice and stays, including every `inherit-paren
 
 ### 4. Validate
 
-Write the candidate to a temp file. Call `orchestrator_capabilities` again and save its result to a temp file as `{"providers": [...]}`, copying verbatim the entry of every provider instance the candidate or the defaults name. Run `node <plugin root>/skills/setup-pstack/scripts/t3-sheet.mjs <candidate> <catalog.json>`, where `<plugin root>` is the directory that holds this plugin's `skills/`, and fix every line it prints. Every entry's reasoning option must be at `xhigh` or below. If `node` is missing, check each entry against the catalog by reading, and say so. A role with no line runs on its default, so add a line for any role whose default this machine cannot run.
+Write the candidate to a temp file. Call `orchestrator_capabilities` again and save its result to a temp file as `{"providers": [...]}`, copying verbatim the entry of every provider instance the candidate or the defaults name. Its list is short, so add to each provider's `models` every model the candidate or the defaults name that it omits, as `search` with that model's ID returns it. Run `node <plugin root>/skills/setup-pstack/scripts/t3-sheet.mjs <candidate> <catalog.json>`, where `<plugin root>` is the directory that holds this plugin's `skills/`, and fix every line it prints. Every entry's reasoning option must be at `xhigh` or below. If `node` is missing, check each entry against the catalog by reading, and say so. A role with no line runs on its default, so add a line for any role whose default this machine cannot run.
 
 ### 5. Write the sheet
 
@@ -62,10 +62,10 @@ bug-fix: claudeAgent/claude-opus-5-5 effort=xhigh
 perf-issue: claudeAgent/claude-opus-5-5 effort=xhigh
 hillclimb: claudeAgent/claude-opus-5-5 effort=xhigh
 judgment and prose: claudeAgent/claude-opus-5-5 effort=xhigh
-arena runners: claudeAgent/claude-fable-5-2 effort=high, claudeAgent/claude-opus-5-5 effort=high, antigravity/gemini-4-carbon thinking_level=high
-arena cross-judge pool: claudeAgent/claude-opus-5-5 effort=high, antigravity/gemini-4-carbon thinking_level=high
+arena runners: claudeAgent/claude-fable-5-2 effort=high, claudeAgent/claude-opus-5-5 effort=high, antigravity/gemini-4-neon thinking_level=high
+arena cross-judge pool: claudeAgent/claude-opus-5-5 effort=high, antigravity/gemini-4-neon thinking_level=high
 swarm workers: claudeAgent/claude-opus-5-5 effort=high
-interrogate reviewers: claudeAgent/claude-fable-5-2 effort=high, claudeAgent/claude-opus-5-5 effort=high, antigravity/gemini-4-carbon thinking_level=high
+interrogate reviewers: claudeAgent/claude-fable-5-2 effort=high, claudeAgent/claude-opus-5-5 effort=high, antigravity/gemini-4-neon thinking_level=high
 session hook: on
 ```
 
