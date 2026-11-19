@@ -167,6 +167,15 @@ describe("discoverHomes", () => {
     ]);
   });
 
+  test("collapses `..` in a KIRO_HOME before it resolves symlinks, as kiro-cli does", () => {
+    const root = tmp();
+    mkdirSync(join(root, "x/y"), { recursive: true });
+    mkdirSync(join(root, "x/c"));
+    symlinkSync(join(root, "x/y"), join(root, "link-b"));
+    const found = discoverHomes({ env: { T3CODE_HOME: tmp(), KIRO_HOME: `${root}/link-b/../c` }, home: "/home/u" });
+    expect(found.homes.slice(2)).toEqual([{ harness: "kiro", dir: join(root, "c"), from: ["KIRO_HOME"], bin: "kiro-cli" }]);
+  });
+
   test("expands a leading ~ in an instance's home variable and binary as T3 does", () => {
     const t3 = tmp();
     writeJson(join(t3, "userdata/settings.json"), {
