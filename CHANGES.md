@@ -2,6 +2,33 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-T3 rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 2.5.2 - /statechart runs on native Windows
+
+t3-pstack moves to Lauren Tan's pstack at cursor/plugins `0b46ec3` ([pstack #1292](https://github.com/cursor/plugins/pull/1292)) for all three components, and pstack's version moves from 0.15.45 to 0.15.46. Only the `statechart` skill changed upstream. cursor-team-kit and thermos have no change between `dd24b67` and `0b46ec3`, and their pins move with pstack's.
+
+**What changed upstream.** On native Windows, `/statechart` spawned `/bin/sh` to stop TLC's process group and to clean up after the check, and TLC printed `\r\n` line ends that the line readers split on `\n` alone, so the leftover `\r` hid a broken rule from the verdict.
+
+- The line readers split on `\r?\n`: the DOT parser, the reader of TLC's output files, and the reader of its piped output.
+- The group kill moves to `kill.ts`. It runs `taskkill /t /f` on Windows and sends `SIGKILL` to the process group elsewhere. The janitor that removes the scratch folders is now `janitor.ts`, run on the same runtime as the command, instead of a `/bin/sh` loop. On Windows, where the group does not outlive the worker, the janitor and the command kill it only while it still runs, so they spare a pid Windows has reused.
+- `java` and `mise` start with `windowsHide`, TLC runs with `-Dstdout.encoding=UTF-8` and `-Dstderr.encoding=UTF-8`, and the worker gets `TEMP` and `TMP` along with `TMPDIR`.
+- SKILL.md says `scripts/statechart` is a POSIX shell script, and that on native Windows the command is `node --disable-warning=ExperimentalWarning <skill dir>/scripts/statechart.ts` on Node 22.18 to 22.x, or 23.6 or later.
+- New tests replay every corpus case with TLC's output in Windows line ends, and check that a `\r\n` verdict names the broken invariant as the `\n` one does.
+
+2.1.0 recorded that the skill does not run on native Windows, from reading the source. That no longer holds, though no Windows host ran this release either.
+
+**What the port adapted.** Nothing. `bun tools/sync.mjs` updated 6 files and added 2, all under `skills/statechart`, with no merge and no conflict. No substitution matches the new text, so the rule count stays at 139, and the 16 forked files are untouched. Each written file is byte-identical to upstream at `0b46ec3`. The scripts' `package.json` keeps `fast-check` at 4.5.3, so the root `bun.lock` pin stays.
+
+**Verification.**
+
+On macOS 27.0:
+
+- `bun tools/generate.mjs --check` reports 14 generated files current. `GIT_CONFIG_GLOBAL=/dev/null bun test tests/ --timeout 30000` passes 545, skips 56, and fails 0. The installer's end-to-end test passes 18 of 18 with Claude Code 2.1.328 and Codex 0.170.0. `validate-skills` keeps every local link inside the skills tree.
+- The dry run at `0b46ec3` passes for all three components, with no undeclared fork and no substitution that matches nothing.
+- The skill script tests as CI runs them, on Node 22.23.4 and without TLC, pass 303, skip 70, and fail only the launcher symlink test, which fails the same way before this sync under `/var` and passes with a physical `TMPDIR`, as 2.1.0 recorded. With a physical `TMPDIR` they pass 304, skip 70, and fail 0. With `TLA2TOOLS` and `JAVA` pointed at the mise-installed TLC 1.7.4 and Temurin 25, the versions the scripts pin, they pass 407 of 407.
+- On the 0.15.45 scripts, all 34 of the new Windows line-end tests fail: the old readers leave `@!@!@ENDMSG` markers in `tlc.out`, and the verdict loses the broken invariant `NotOne`. On 0.15.46's they pass.
+
+This is a patch release, and no user has to act. Neither hooks file changes. On Codex, run `npx -y github:chhoumann/t3-pstack update` as after every release.
+
 ## 2.5.1 - The panel's Gemini seat runs at xhigh, and dispatches on Antigravity 1.5
 
 t3-pstack moves to Lauren Tan's pstack at cursor/plugins `dd24b67` ([pstack #1284](https://github.com/cursor/plugins/pull/1284)) for all three components, and pstack's version moves from 0.15.44 to 0.15.45. Only pstack changed upstream. cursor-team-kit and thermos have no change between `e58dd04` and `dd24b67`, and their pins move with pstack's.
