@@ -68,24 +68,32 @@ describe("locators", () => {
 
 describe("regions", () => {
   test("every skill a role names gets that role's tier default stamped in its Models section", () => {
-    const marked = { ...models, tiers: { default: "x/marker-default", strongest: "x/marker-strongest", panel: ["a/claude-p", "b/gpt-p"] } };
+    const marked = {
+      ...models,
+      tiers: { default: "x/marker-default", fast: "x/marker-fast", panel: ["a/claude-p", "b/gpt-p"], judges: ["c/claude-j", "d/gemini-j"] },
+    };
     for (const skill of new Set(models.roles.map((r) => r.skill))) {
       const file = `plugins/pstack/skills/${skill}/SKILL.md`;
       const stamped = applyRegions(file, readFileSync(join(repoRoot, file), "utf8"), marked, { strict: true });
       for (const role of models.roles.filter((r) => r.skill === skill)) {
-        const expected = { default: "`x/marker-default`", strongest: "`x/marker-strongest`", panel: "`a/claude-p`, `b/gpt-p`" }[role.tier];
+        const expected = {
+          default: "`x/marker-default`",
+          fast: "`x/marker-fast`",
+          panel: "`a/claude-p`, `b/gpt-p`",
+          judges: "`c/claude-j`, `d/gemini-j`",
+        }[role.tier];
         expect(stamped).toContain(`- ${role.role}: ${expected}`);
       }
     }
   });
 
   test("applyRegions stamps in place and is idempotent", () => {
-    const file = "plugins/pstack/skills/how/SKILL.md";
-    const text = "# how\n\n## Models\n\nstale\n\n## After\nkeep\n";
+    const file = "plugins/pstack/skills/swarm/SKILL.md";
+    const text = "# swarm\n\n## Models\n\nstale\n\n## After\nkeep\n";
     const once = applyRegions(file, text, models, { strict: true });
     expect(once).not.toContain("stale");
     expect(once).toContain("## After\nkeep\n");
-    expect(once).toContain("- how explorer: `claudeAgent/claude-opus-5-5 effort=xhigh`");
+    expect(once).toContain("- swarm workers: `claudeAgent/claude-opus-5-5 effort=high`");
     expect(applyRegions(file, once, models, { strict: true })).toBe(once);
   });
 
@@ -256,17 +264,18 @@ describe("deriveT3", () => {
   });
 
   test("appends and stamps a Models section when upstream has none, naming the sheet and the entry grammar", () => {
-    const out = deriveT3("plugins/pstack/skills/how/SKILL.md", front(""), models);
+    const out = deriveT3("plugins/pstack/skills/swarm/SKILL.md", front(""), models);
     expect(out).toContain("body\n\n## Models\n\nRole defaults on T3, stamped from `plugins/pstack/models.json`.");
     expect(out).toContain("`t3-pstack-models.md`");
     expect(out).toContain("It splits at its first `/`");
-    expect(out.endsWith("- how explainer: `claudeAgent/claude-opus-5-5 effort=xhigh`\n")).toBe(true);
-    expect(deriveT3("plugins/pstack/skills/how/SKILL.md", out, models)).toBe(out);
+    expect(out.endsWith("- swarm workers: `claudeAgent/claude-opus-5-5 effort=high`\n")).toBe(true);
+    expect(deriveT3("plugins/pstack/skills/swarm/SKILL.md", out, models)).toBe(out);
   });
 
   test("names the alias a released sheet may still use", () => {
-    const out = deriveT3("plugins/pstack/skills/poteto-mode/SKILL.md", front("", "poteto-mode"), models);
-    expect(out).toContain("- hardest tasks: `claudeAgent/claude-fable-5-1 effort=xhigh` (a `strongest judgment` line counts as this role)");
+    const aliased = { ...models, roles: models.roles.map((r) => (r.role === "bug-fix" ? { ...r, alias: "bugfix" } : r)) };
+    const out = deriveT3("plugins/pstack/skills/poteto-mode/SKILL.md", front("", "poteto-mode"), aliased);
+    expect(out).toContain(`- bug-fix: \`${models.tiers.default}\` (a \`bugfix\` line counts as this role)`);
   });
 
   test("a file no region names passes through", () => {
@@ -358,13 +367,13 @@ describe("plan, changes, apply", () => {
 
   test("a hand edit to a stamped Models line or to the sheet block is restored", () => {
     const root = repoCopy();
-    const how = "plugins/pstack/skills/how/SKILL.md";
+    const swarm = "plugins/pstack/skills/swarm/SKILL.md";
     const setup = "plugins/pstack/skills/setup-pstack/SKILL.md";
     const text = (rel) => readFileSync(join(root, rel), "utf8");
-    writeFileSync(join(root, how), text(how).replace(/^- how explorer: .*$/m, "- how explorer: stale"));
+    writeFileSync(join(root, swarm), text(swarm).replace(/^- swarm workers: .*$/m, "- swarm workers: stale"));
     writeFileSync(join(root, setup), text(setup).replace(/^bug-fix: .*$/m, "bug-fix: stale"));
     const { files } = plan(root);
-    for (const rel of [how, setup]) expect(files[rel]).toBe(readFileSync(join(repoRoot, rel), "utf8"));
+    for (const rel of [swarm, setup]) expect(files[rel]).toBe(readFileSync(join(repoRoot, rel), "utf8"));
   });
 
   test("apply rewrites only the files whose bytes differ", () => {

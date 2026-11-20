@@ -11,7 +11,7 @@ Upstream owns the skill text. This port owns the rewrite of upstream's Cursor me
 - **Substitutions.** [`tools/substitutions.json`](tools/substitutions.json) rewrites each upstream sentence that names a Cursor mechanism: the `Task` tool, `subagent_type`, model slugs, the `pstack-models.mdc` rule, cloud agents, `/loop`, Cursor paths. Most T3 behavior the port adds, such as the dispatch ledger, is an anchored insert: a rule whose pattern is an upstream sentence and whose replacement keeps that sentence and appends the T3 text. A substitution leaves upstream's later edits elsewhere in the file mechanical, so the port prefers it to a fork. Each rule's `rationale` names why it exists, and most cite the section of t3-pstack 1.0.14's `t3-tools.md` it replaces.
 - **Forks.** [`tools/forks.json`](tools/forks.json) declares each file the port keeps in its own form, with a `kind`, a one-sentence `why`, the `since` release, and an `upstream` status. Today that is setup-pstack, which writes the T3 model sheet, the hook points of the watch-pr settle overlay, the poteto-mode scripts' bootstrap, which installs their dependencies outside the installed plugin, the files that carry the rules and watch-pr fixes restored from Michael Denyer's pstack-claude, and the worktree audit and cleanup playbook, which fix [cursor/plugins#449](https://github.com/cursor/plugins/issues/449). Every upstream change to a forked file needs a person to merge it, so a fork is the last resort.
 
-The port also owns files upstream does not have: the plugin manifests, the session-start hooks and their routing text, `models.json`, the sheet checker `t3-sheet.mjs`, the watch-pr settle overlay (`settle.ts`), and the transcript lookups reflect uses. The sync lists them as port-only.
+The port also owns files upstream does not have: the plugin manifests, the session-start hooks and their routing text, `models.json`, the sheet checker `t3-sheet.mjs`, and the watch-pr settle overlay (`settle.ts`). The sync lists them as port-only.
 
 Before changing a file under `plugins/pstack/skills` or `plugins/pstack/agents`, work out which kind of change it is:
 
@@ -47,9 +47,9 @@ bun tools/generate.mjs
 GIT_CONFIG_GLOBAL=/dev/null bun test tests/ --timeout 30000
 ```
 
-The generator stamps `VERSION` into the Claude Code and Codex manifests, the marketplace entry, and `package.json`. It renders each model-consuming skill's Models section and setup-pstack's sheet block from `plugins/pstack/models.json`, lists the plugin's agents in the Claude Code manifest, and copies the license and notice files into the installed plugin. It checks each skill's frontmatter, every local Markdown link, the plugin layout, agent frontmatter, the Codex marketplace, and both hooks files against their pins in `tools/frozen-hooks.json`. CI runs `bun tools/generate.mjs --check`, which writes nothing and fails naming each generated file that is stale or orphaned, so commit the generator's output. `.pre-commit-config.yaml` runs the same check before each commit once you run `prek install` (or `pre-commit install`).
+The generator stamps `VERSION` into the Claude Code, Codex, and Antigravity manifests, the marketplace entry, and `package.json`. It renders each model-consuming skill's Models section and setup-pstack's sheet block from `plugins/pstack/models.json`, lists the plugin's agents in the Claude Code manifest, and copies the license and notice files into the installed plugin. It checks each skill's frontmatter, every local Markdown link, the plugin layout, agent frontmatter, the Codex marketplace, the Claude Code and Codex hooks files against their pins in `tools/frozen-hooks.json`, and the Antigravity hooks file's shape and scripts. Antigravity trusts no hook by hash, so its `hooks.json` has no pin. CI runs `bun tools/generate.mjs --check`, which writes nothing and fails naming each generated file that is stale or orphaned, so commit the generator's output. `.pre-commit-config.yaml` runs the same check before each commit once you run `prek install` (or `pre-commit install`).
 
-Change model defaults in `models.json`, never in a skill body. A role names a tier (`default`, `strongest`, or `panel`), and each tier holds T3 entries in the grammar `t3-sheet.mjs` checks. The panel must span two model families. A role may carry an `alias`, the label a sheet written before upstream renamed the role still uses.
+Change model defaults in `models.json`, never in a skill body. A role names a tier (`default`, `fast`, `panel`, or `judges`), and each tier holds T3 entries in the grammar `t3-sheet.mjs` checks. `panel` and `judges` are lists, and each must span two model families. A role may carry an `alias`, the label a sheet written before upstream renamed the role still uses. When upstream drops a role, move its label to `retired`, so the checker and `doctor` pass the line a released sheet still carries.
 
 If you touched `skills/poteto-mode/scripts/`:
 
@@ -57,8 +57,8 @@ If you touched `skills/poteto-mode/scripts/`:
 cd plugins/pstack/skills/poteto-mode/scripts
 bun install --frozen-lockfile
 bun run typecheck
-GIT_CONFIG_GLOBAL=/dev/null bun test watch-pr check-plan.test.ts
-bunx prettier@3.6.2 --check watch-pr/settle.ts watch-pr/settle.test.ts watch-pr/verdicts.test.ts resolve-codex-transcript.ts
+GIT_CONFIG_GLOBAL=/dev/null bun test watch-pr
+bunx prettier@3.6.2 --check watch-pr/settle.ts watch-pr/settle.test.ts watch-pr/verdicts.test.ts
 ```
 
 Upstream's scripts are not Prettier output, so the format check covers the port's own TypeScript only.
@@ -105,4 +105,4 @@ Versions follow semantic versioning, and each sync of Lauren's pstack is its own
 
 ## Reporting bugs
 
-Include the t3-pstack version, the T3 Code version, the host (Claude Code or Codex) and its version, and the reproduction steps.
+Include the t3-pstack version, the T3 Code version, the host (Claude Code, Codex, or Antigravity) and its version, and the reproduction steps.

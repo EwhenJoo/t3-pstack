@@ -32,6 +32,23 @@ const github = (repo) => ({ key: `github:${repo.toLowerCase()}`, label: repo, re
 const gitUrl = (url) => (GITHUB_URL.test(url) ? { ...github(url.match(GITHUB_URL)[1]), label: url } : { key: `git:${url}`, label: url });
 const directory = (path) => ({ key: `local:${existsSync(path) ? realpathSync(path) : resolve(path)}`, label: path });
 
+// The GitHub repository npx fetched this installer from, so a fork's own
+// `npx -y github:<owner>/t3-pstack` installs from that fork with no --source.
+// npx writes the spec it was given to the package.json two levels above the
+// package, at <npm cache>/_npx/<hash>/node_modules/t3-pstack.
+const GITHUB_SPEC = /^(?:github:)?([A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9._-]+?)(?:\.git)?(?:#.*)?$/;
+export function npxOrigin(packageRoot) {
+  const root = resolve(packageRoot);
+  if (basename(dirname(root)) !== "node_modules") return undefined;
+  let spec;
+  try {
+    spec = JSON.parse(readFileSync(join(root, "..", "..", "package.json"), "utf8")).dependencies?.["t3-pstack"];
+  } catch {
+    return undefined;
+  }
+  return typeof spec === "string" ? spec.match(GITHUB_SPEC)?.[1] : undefined;
+}
+
 // `--source`, read as both CLIs read it: `owner/repo` is GitHub, a URL or
 // `user@host:path` is Git, and anything else is a directory, which must exist.
 export function parseSource(text, home) {
