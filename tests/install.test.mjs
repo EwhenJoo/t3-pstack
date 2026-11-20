@@ -813,8 +813,11 @@ const entryState = (path) =>
 const treeState = (dir) =>
   Object.fromEntries(
     readdirSync(dir, { recursive: true, withFileTypes: true })
-      .filter((entry) => entry.isFile())
-      .map((entry) => [join(entry.parentPath, entry.name), readFileSync(join(entry.parentPath, entry.name), "utf8")]),
+      .filter((entry) => entry.isFile() || entry.isSymbolicLink())
+      .map((entry) => {
+        const path = join(entry.parentPath, entry.name);
+        return [path, entry.isSymbolicLink() ? { link: readlinkSync(path) } : readFileSync(path)];
+      }),
   );
 const sha256 = (text) => createHash("sha256").update(text).digest("hex");
 const RECORD = ".t3-pstack-install.json";
@@ -1065,6 +1068,34 @@ describe("Kiro", () => {
       { name: "skills", ok: true, detail: `${shippedSkills} linked` },
       { name: "hook", ok: true, detail: join(user, "kiro/hooks/t3-pstack.json") },
     ]);
+  });
+
+  test("the installer CLI installs from a --source whose plugin is a link without writing into that source, and a second run changes nothing", () => {
+    const user = tmp();
+    const bin = join(user, "bin");
+    mkdirSync(bin);
+    symlinkSync(spawnSync("node", ["-p", "process.execPath"], { encoding: "utf8" }).stdout.trim(), join(bin, "node"));
+    writeFileSync(join(bin, "kiro-cli"), "#!/bin/sh\n", { mode: 0o755 });
+    const plugin = join(tmp(), "pstack");
+    cpSync(pluginRoot, plugin, { recursive: true });
+    const source = join(tmp(), "source");
+    cpSync(join(repoRoot, "tools/frozen-hooks.json"), join(source, "tools/frozen-hooks.json"));
+    mkdirSync(join(source, "plugins"));
+    symlinkSync(plugin, join(source, "plugins/pstack"));
+    const sourceState = () => ({ ...treeState(source), ...treeState(plugin) });
+    const before = sourceState();
+    const install = () => {
+      const r = spawnSync(join(bin, "node"), [join(repoRoot, "tools/install.mjs"), "install", "--source", source, "--kiro-home", "~/kiro", "--json"], {
+        cwd: user,
+        env: { PATH: `${bin}:/usr/bin:/bin`, HOME: user },
+        encoding: "utf8",
+      });
+      return JSON.parse(r.stdout).homes.find((h) => h.harness === "kiro").steps;
+    };
+    expect(install()).toContain(`installed ${shipped}`);
+    expect(sourceState()).toEqual(before);
+    expect(install()).toEqual([]);
+    expect(sourceState()).toEqual(before);
   });
 
   test("the installer CLI fills ~/.kiro in place of each KIRO_HOME that Kiro ignores, and warns with each value", () => {
