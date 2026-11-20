@@ -142,11 +142,6 @@ function writeRecord(fresh, version, hooks, old) {
   writeFileSync(join(fresh, INSTALL_RECORD), JSON.stringify(record, null, 2) + "\n", { flag: "wx" });
 }
 
-const deletable = (path) => {
-  const record = readRecord(path);
-  return record !== undefined && extraFiles(path, record).length === 0;
-};
-
 const copyStep = ({ kind, record }, version) => {
   if (kind === "missing") return `installed ${version}`;
   return record.version === version ? `reinstalled ${version}, whose files were missing or changed` : `updated ${record.version} to ${version}`;
@@ -164,7 +159,7 @@ function replaceCopy(path, state, hooks, context) {
   if (old) renameSync(path, old);
   // Checked again once moved aside, so nothing that landed at the path after
   // copyState read it gets deleted.
-  if (old && !deletable(old)) {
+  if (old && theirs(copyState(old, context))) {
     renameSync(old, path);
     rmSync(fresh, { recursive: true, force: true });
     throw new Error(`${path} changed while the installer ran, so the installer left it as it was`);
