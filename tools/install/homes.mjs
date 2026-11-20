@@ -9,10 +9,11 @@
 // expands a leading `~` in the first two and in `config.binaryPath`
 // (provider-core pathExpansion.ts). Kiro settings have no home path
 // (packages/provider-kiro/src/settings.ts), and T3 passes a kiro instance's
-// KIRO_HOME as written (provider-core instanceEnvironment.ts), so its home is
-// the one kiro-cli makes of that value: the value when it is absolute and does
-// not hold the home folder, else ~/.kiro. T3 runs its `config.binaryPath`,
-// else kiro-cli (packages/provider-kiro/src/server/acpSupport.ts and driver.ts).
+// KIRO_HOME as written, over T3's own (provider-core instanceEnvironment.ts),
+// so its home is the one kiro-cli makes of the instance's value, else of the
+// installer's: the value when it is absolute and does not hold the home
+// folder, else ~/.kiro. T3 runs its `config.binaryPath`, else kiro-cli
+// (packages/provider-kiro/src/server/acpSupport.ts and driver.ts).
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
@@ -62,15 +63,15 @@ function kiroHome(value, home) {
 
 // T3 keeps a secret variable's value out of settings.json and resolves it only
 // to start the CLI (apps/server/src/serverSettings.ts persistSettingsSecrets).
-function kiroInstanceHome(instance, home) {
+function kiroInstanceHome(instance, home, inherited) {
   const variable = (instance.environment ?? []).findLast((v) => v.name === HARNESSES.kiro.env);
   if (variable?.secret || variable?.valueRedacted === true) return { secret: true };
   const bin = trimmed(instance.config?.binaryPath);
-  return { ...kiroHome(variable?.value, home), bin: bin && expand(bin, home) };
+  return { ...kiroHome(variable ? variable.value : inherited, home), bin: bin && expand(bin, home) };
 }
 
-function instanceHome(instance, harness, home) {
-  if (harness === "kiro") return kiroInstanceHome(instance, home);
+function instanceHome(instance, harness, home, inherited) {
+  if (harness === "kiro") return kiroInstanceHome(instance, home, inherited);
   const config = instance.config ?? {};
   const instanceEnv = Object.fromEntries((instance.environment ?? []).map((v) => [v.name, v.value ?? ""]));
   const dir = trimmed(config.homePath) ?? trimmed(instanceEnv[HARNESSES[harness].env]);
@@ -83,20 +84,20 @@ function instanceHome(instance, harness, home) {
   };
 }
 
-function settingsHomes({ instances, overrides }, settingsPath, home) {
+function settingsHomes({ instances, overrides }, settingsPath, home, inherited) {
   const found = [];
   for (const [id, instance] of Object.entries(instances)) {
     const harness = DRIVERS[instance.driver];
     if (!harness) continue;
     const disabled = instance.enabled === false || instance.config?.enabled === false;
     const from = `T3 instance ${id}${disabled ? " (disabled)" : ""}`;
-    const at = harness === "antigravity" ? { dir: antigravityProfile(settingsPath, id) } : instanceHome(instance, harness, home);
+    const at = harness === "antigravity" ? { dir: antigravityProfile(settingsPath, id) } : instanceHome(instance, harness, home, inherited);
     found.push({ harness, from, ...at });
   }
   // T3's built-in kiro instance runs unconfigured wherever a project turns it
   // on (apps/server ProviderInstanceRegistryHydration.ts deriveProviderInstanceConfigMap).
   if (!("kiro" in instances) && Object.values(overrides).some((project) => project?.providerInstances?.kiro?.enabled === true)) {
-    found.push({ harness: "kiro", from: "T3 instance kiro (on in a project)", dir: join(home, HARNESSES.kiro.home) });
+    found.push({ harness: "kiro", from: "T3 instance kiro (on in a project)", ...kiroHome(inherited, home) });
   }
   return found;
 }
@@ -120,7 +121,7 @@ export function discoverHomes({ env, home, claudeHomes = [], codexHomes = [], ki
 
   const settingsPath = t3SettingsPath(env, home);
   const settings = readT3Settings(settingsPath);
-  const found = settingsHomes(settings, settingsPath, home);
+  const found = settingsHomes(settings, settingsPath, home, env[HARNESSES.kiro.env]);
   const secrets = found.filter((at) => at.secret).map((at) => at.from);
   found.filter((at) => !at.secret).forEach(add);
   // A Codex shadow home is T3's auth overlay: its config.toml, plugins, and
