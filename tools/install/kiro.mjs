@@ -5,15 +5,17 @@
 // <home>/skills/<name> and a hook from any file in <home>/hooks, so the
 // installer keeps a copy of the plugin at <home>/t3-pstack, links each skill
 // into it, and writes a hooks file that runs the copy's session-start hook.
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, symlinkSync, unlinkSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 
-import { check, copyCheck, foreignCopy, installCopy, isPlainCopy, SESSION_START_FILES, tempBeside, writeAtomic } from "./common.mjs";
+import { check, isPlainCopy, readJson, tempBeside } from "./common.mjs";
+import { INSTALL_RECORD } from "../plugin.mjs";
 
-const MANIFEST = ".claude-plugin/plugin.json";
+const SESSION_START_FILES = ["hooks/session-start.sh", "hooks/session-start-context.md", "skills/setup-pstack/scripts/read-sheet.sh"];
 const copyPath = (home) => join(home.dir, "t3-pstack");
 const hooksPath = (home) => join(home.dir, "hooks", "t3-pstack.json");
-const readHooks = (home) => (existsSync(hooksPath(home)) ? readFileSync(hooksPath(home), "utf8") : undefined);
+const sha256 = (data) => createHash("sha256").update(data).digest("hex");
 
 const quote = (text) => `'${text.replaceAll("'", "'\\''")}'`;
 
@@ -98,22 +100,126 @@ function linkSkills(home, skills) {
   ].filter(Boolean);
 }
 
-function writeHooks(home) {
-  const before = readHooks(home);
-  const text = hooksFile(copyPath(home));
-  if (before === text) return [];
-  mkdirSync(dirname(hooksPath(home)), { recursive: true });
-  writeAtomic(hooksPath(home), text);
-  return [before === undefined ? `wrote ${hooksPath(home)}` : `rewrote ${hooksPath(home)}, which had changed`];
+// readdirSync's `recursive` follows a symlinked directory, so this walk
+// recurses only into real ones.
+function* files(dir, prefix = "") {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) yield* files(join(dir, entry.name), join(prefix, entry.name));
+    else yield join(prefix, entry.name);
+  }
+}
+
+function readRecord(path) {
+  const file = join(path, INSTALL_RECORD);
+  const record = existsSync(file) ? readJson(file) : undefined;
+  return record?.installer === "t3-pstack" ? record : undefined;
+}
+
+function extraFiles(path, record) {
+  const listed = new Set(record.files);
+  return [...files(path)].filter((file) => file !== INSTALL_RECORD && !listed.has(file));
+}
+
+const stale = (path, record, { version, skills, pluginRoot }) =>
+  record.version !== version ||
+  !record.files.every((file) => existsSync(join(path, file))) ||
+  ![...skills.keys()].every((name) => existsSync(join(path, "skills", name, "SKILL.md"))) ||
+  !SESSION_START_FILES.every((file) => readFileSync(join(path, file)).equals(readFileSync(join(pluginRoot, file))));
+
+function copyState(path, context) {
+  if (!lstatSync(path, { throwIfNoEntry: false })) return { kind: "missing" };
+  const record = readRecord(path);
+  if (!record) return { kind: "foreign" };
+  const extra = extraFiles(path, record);
+  if (extra.length) return { kind: "extra", record, extra };
+  return { kind: stale(path, record, context) ? "stale" : "current", record };
+}
+
+const theirs = (state) => state.kind === "foreign" || state.kind === "extra";
+
+function writeRecord(fresh, version, hooks) {
+  const record = { installer: "t3-pstack", version, files: [...files(fresh)], hooks: sha256(hooks) };
+  writeFileSync(join(fresh, INSTALL_RECORD), JSON.stringify(record, null, 2) + "\n", { flag: "wx" });
+}
+
+const deletable = (path) => {
+  const record = readRecord(path);
+  return record !== undefined && extraFiles(path, record).length === 0;
+};
+
+const copyStep = ({ kind, record }, version) => {
+  if (kind === "missing") return `installed ${version}`;
+  return record.version === version ? `reinstalled ${version}, whose files were missing or changed` : `updated ${record.version} to ${version}`;
+};
+
+// A whole tree swapped in by rename, so a session never loads half a plugin
+// and files a release dropped do not linger.
+function replaceCopy(path, state, hooks, context) {
+  if (state.kind === "current") return [];
+  const fresh = tempBeside(path);
+  cpSync(context.pluginRoot, fresh, { recursive: true });
+  writeRecord(fresh, context.version, hooks);
+  const old = lstatSync(path, { throwIfNoEntry: false }) ? tempBeside(path) : undefined;
+  if (old) renameSync(path, old);
+  // Checked again once moved aside, so nothing that landed at the path after
+  // copyState read it gets deleted.
+  if (old && !deletable(old)) {
+    renameSync(old, path);
+    rmSync(fresh, { recursive: true, force: true });
+    throw new Error(`${path} changed while the installer ran, so the installer left it as it was`);
+  }
+  renameSync(fresh, path);
+  if (old) rmSync(old, { recursive: true, force: true });
+  return [copyStep(state, context.version)];
+}
+
+function hooksState(path, record, text) {
+  const stat = lstatSync(path, { throwIfNoEntry: false });
+  if (!stat) return "missing";
+  if (!stat.isFile()) return "foreign";
+  const hash = sha256(readFileSync(path));
+  if (hash === sha256(text)) return "current";
+  return hash === record?.hooks ? "stale" : "foreign";
+}
+
+const HOOK_STEPS = { missing: (path) => `wrote ${path}`, stale: (path) => `rewrote ${path}, which had changed` };
+
+function writeHooks(path, state, text) {
+  if (!(state in HOOK_STEPS)) return [];
+  mkdirSync(dirname(path), { recursive: true });
+  // writeAtomic lands on a link's target, so this renames over the path itself.
+  const fresh = tempBeside(path);
+  writeFileSync(fresh, text, { flag: "wx" });
+  renameSync(fresh, path);
+  return [HOOK_STEPS[state](path)];
 }
 
 export function installKiro(home, context) {
   // Kiro creates its home private.
   mkdirSync(home.dir, { recursive: true, mode: 0o700 });
+  const path = copyPath(home);
+  const state = copyState(path, context);
   // The links and the hooks file point into the copy, so neither goes in
-  // while another tree holds its path.
-  if (foreignCopy(copyPath(home), MANIFEST)) return [];
-  return [...installCopy(copyPath(home), MANIFEST, SESSION_START_FILES, context), ...linkSkills(home, context.skills), ...writeHooks(home)];
+  // while its path holds anything the installer did not put there.
+  if (theirs(state)) return [];
+  const text = hooksFile(path);
+  const hooks = hooksState(hooksPath(home), state.record, text);
+  return [...replaceCopy(path, state, text, context), ...linkSkills(home, context.skills), ...writeHooks(hooksPath(home), hooks, text)];
+}
+
+const INSTALLED = {
+  missing: (path, state, { hint }) => ["not installed", hint],
+  foreign: (path, state, { hint }) => [`${path} is not t3-pstack's copy, since it has no ${INSTALL_RECORD} from the installer`, `move ${path} out of the way, then ${hint}`],
+  extra: (path, { extra }, { hint }) => [`${path} holds files the installer did not put there: ${extra.join(", ")}`, `move or delete them, then ${hint}`],
+  stale: (path, { record }, { version, hint }) => [
+    record.version === version ? `${version}, but its files at ${path} are missing or changed` : `${record.version}, expected ${version}`,
+    hint,
+  ],
+};
+
+function installedCheck(path, state, context) {
+  if (state.kind === "current") return check("installed", true, context.version);
+  return check("installed", false, ...INSTALLED[state.kind](path, state, context));
 }
 
 function skillsCheck({ link, repoint, unlink, collisions }, skills, hint) {
@@ -133,11 +239,16 @@ const collisionCheck = ({ name, path, kind, linked }, hint) =>
     `${COLLISIONS[kind].fix}, then ${hint}`,
   );
 
-function hookCheck(home, hint) {
-  const text = readHooks(home);
-  const ok = text === hooksFile(copyPath(home));
+const HOOK = {
+  missing: (path, hint) => [`${path} is missing`, hint],
+  stale: (path, hint) => [`${path} is not the file this release writes`, hint],
+  foreign: (path, hint) => [`${path} is not a file the installer wrote`, `move or delete it, then ${hint}`],
+};
+
+function hookCheck(home, record, hint) {
   const path = hooksPath(home);
-  return check("hook", ok, ok ? path : text === undefined ? `${path} is missing` : `${path} is not the file this release writes`, hint);
+  const state = hooksState(path, record, hooksFile(copyPath(home)));
+  return state === "current" ? check("hook", true, path) : check("hook", false, ...HOOK[state](path, hint));
 }
 
 const ignoredCheck = (ignored, hint) =>
@@ -151,13 +262,16 @@ const ignoredCheck = (ignored, hint) =>
 
 export function doctorKiro(home, context) {
   const warnings = home.ignored ? [ignoredCheck(home.ignored, context.hint)] : [];
-  if (foreignCopy(copyPath(home), MANIFEST)) return [...warnings, copyCheck(copyPath(home), MANIFEST, SESSION_START_FILES, context)];
+  const path = copyPath(home);
+  const state = copyState(path, context);
+  const installed = installedCheck(path, state, context);
+  if (theirs(state)) return [...warnings, installed];
   const plan = skillPlan(home, context.skills);
   return [
     ...warnings,
-    copyCheck(copyPath(home), MANIFEST, SESSION_START_FILES, context),
+    installed,
     skillsCheck(plan, context.skills, context.hint),
     ...plan.collisions.map((entry) => collisionCheck(entry, context.hint)),
-    hookCheck(home, context.hint),
+    hookCheck(home, state.record, context.hint),
   ];
 }
