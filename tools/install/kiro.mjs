@@ -157,7 +157,8 @@ const copyStep = ({ kind, record }, version) => {
 function replaceCopy(path, state, hooks, context) {
   if (state.kind === "current") return [];
   const fresh = tempBeside(path);
-  cpSync(context.pluginRoot, fresh, { recursive: true });
+  // cpSync copies a linked root as the link, so the record would land in the source.
+  cpSync(realpathSync(context.pluginRoot), fresh, { recursive: true });
   writeRecord(fresh, context.version, hooks);
   const old = lstatSync(path, { throwIfNoEntry: false }) ? tempBeside(path) : undefined;
   if (old) renameSync(path, old);
