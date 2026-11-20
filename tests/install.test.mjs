@@ -993,14 +993,17 @@ describe("Kiro", () => {
     ]);
   });
 
-  test("leaves its own copy that holds a file it did not put there, even one it would otherwise repair, and doctor names the file", () => {
+  test("leaves its own copy of an earlier release that holds a file it did not put there, and doctor names the file", () => {
     const home = kiroHome();
     installKiro(home, kiro);
     const copy = join(home.dir, "t3-pstack");
+    for (const file of [RECORD, ".claude-plugin/plugin.json"]) {
+      writeJson(join(copy, file), { ...JSON.parse(readFileSync(join(copy, file), "utf8")), version: "2.6.0-rc.1" });
+    }
     writeFileSync(join(copy, "my-notes.md"), "personal\n");
-    rmSync(join(copy, ".claude-plugin/plugin.json"));
+    const before = treeState(copy);
     expect(installKiro(home, kiro)).toEqual([]);
-    expect(readFileSync(join(copy, "my-notes.md"), "utf8")).toBe("personal\n");
+    expect(treeState(copy)).toEqual(before);
     expect(doctorKiro(home, kiro)).toEqual([
       {
         name: "installed",
