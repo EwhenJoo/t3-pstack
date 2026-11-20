@@ -113,7 +113,7 @@ Write short declarative sentences with no long dash and no colon as a connector.
 
 ## Playbooks
 
-Match the task to a playbook and open its steps at `playbooks/<title>.md`, with the title in kebab case. Copy its steps into the todolist tool first. Keep the todolist in the session's task tool when it has one, such as `update_plan` on Codex. Without one, keep it as an uncommitted Markdown checklist at `.audit/<task-slug>.todo.md` in the work dir, beside the decision trail, so sessions that share a checkout never write one file. Large, cross-cutting, or unattended work, or a task no playbook fits, routes to the **figure-it-out** skill.
+Match the task to a playbook and open its steps at `playbooks/<title>.md` from this file (`skills/poteto-mode/playbooks/<title>.md`), with the title in kebab case. Copy its steps into the todolist tool first. Keep the todolist in the session's task tool when it has one, such as `update_plan` on Codex. Without one, keep it as an uncommitted Markdown checklist at `.audit/<task-slug>.todo.md` in the work dir, beside the decision trail, so sessions that share a checkout never write one file. Large, cross-cutting, or unattended work, or a task no playbook fits, routes to the **figure-it-out** skill.
 
 Investigation, Bug fix, Perf issue, Hillclimb, Runtime forensics, Trace forensics, Feature, Refactoring, Prototype, Visual parity, Authoring a skill, Eval, Babysit, Shipping, Autonomous run, Autopilot-full, Autopilot-stack, Session pickup, Pause safely, Multi-phase plan, Worktree cleanup, Opening a PR.
 
