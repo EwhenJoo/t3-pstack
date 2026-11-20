@@ -184,7 +184,9 @@ function hooksState(path, record, text) {
 
 const HOOK_STEPS = { missing: (path) => `wrote ${path}`, stale: (path) => `rewrote ${path}, which had changed` };
 
-function writeHooks(path, state, text) {
+function writeHooks(path, record, text) {
+  // Read just before the rename, so a file that landed during the swap stays.
+  const state = hooksState(path, record, text);
   if (!(state in HOOK_STEPS)) return [];
   mkdirSync(dirname(path), { recursive: true });
   // writeAtomic lands on a link's target, so this renames over the path itself.
@@ -203,8 +205,8 @@ export function installKiro(home, context) {
   // while its path holds anything the installer did not put there.
   if (theirs(state)) return [];
   const text = hooksFile(path);
-  const hooks = hooksState(hooksPath(home), state.record, text);
-  return [...replaceCopy(path, state, text, context), ...linkSkills(home, context.skills), ...writeHooks(hooksPath(home), hooks, text)];
+  // state.record was read before the swap, so it still names the text an earlier release wrote.
+  return [...replaceCopy(path, state, text, context), ...linkSkills(home, context.skills), ...writeHooks(hooksPath(home), state.record, text)];
 }
 
 const INSTALLED = {
