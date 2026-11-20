@@ -2,6 +2,38 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-T3 rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 2.5.1 - The panel's Gemini seat runs at xhigh, and dispatches on Antigravity 1.5
+
+t3-pstack moves to Lauren Tan's pstack at cursor/plugins `dd24b67` ([pstack #1284](https://github.com/cursor/plugins/pull/1284)) for all three components, and pstack's version moves from 0.15.44 to 0.15.45. Only pstack changed upstream. cursor-team-kit and thermos have no change between `e58dd04` and `dd24b67`, and their pins move with pstack's.
+
+**The default Gemini seat dispatches on Antigravity 1.5.** T3's `antigravity` provider names its reasoning option after the Antigravity runtime it runs. Runtime 1.5, which T3 installs for every new user and which this Mac and agents-fsn1 run, names it `thought_level`. Runtime 1.4.5, left on hosts that never updated, such as janus, names it `thinking_level`. 2.5.0's defaults named the 1.4 option, so on a 1.5 runtime each default Gemini panel line failed the checker with `no option "thinking_level" (has thought_level)`, and the arena cross-judge pool kept one model family. Antigravity loads the plugin only from 1.5.0 on, so 2.5.1 writes `thought_level` wherever the port names the option: the `panel` and `judges` tiers of `models.json`, the regions rendered from them in arena, interrogate, and setup-pstack, setup-pstack's option list, budget step, and migration example, and poteto-mode's list of reasoning options. On a 1.4.5 runtime the new defaults fail the same way, with `no option "thought_level" (has thinking_level)`, until Antigravity updates or the sheet sets that host's panel lines.
+
+**What changed upstream.** In Lauren's blind comparison of Gemini 4 Neon at high and at xhigh, both caught every planted flaw, and xhigh found more real problems nobody planted, at about 50% more time per run. Panels are where pstack pays for depth, so the seat moves to xhigh.
+
+- The panel's Gemini seat moves from Gemini 4 Neon at high to Gemini 4 Neon at xhigh, in arena's runners and cross-judge pool, poteto-mode's panel default, and setup-pstack's defaults.
+- setup-pstack treats a saved Neon-at-high panel entry as an old default, like any other Gemini 4 panel entry that is not Neon, and moves it to Neon at xhigh. A Neon entry at any other level is the user's choice and stays.
+- A Gemini 4 Neon panel entry takes its own budget target, xhigh moved by the budget, so `large` keeps xhigh, `medium` writes high, and `small` writes medium. Without it, the `large` budget would set the entry to the panel role's high target, and the next run would migrate it back.
+- poteto-mode's "a Gemini seat never runs above high" becomes "a Gemini seat runs at xhigh unless its line names another level".
+
+**What the port adapted.**
+
+- **The T3 default is `antigravity/gemini-4-neon thought_level=xhigh`.** `models.json` moves the Gemini entry of the `panel` and `judges` tiers to it, since Lauren's cross-judge pool moves too, so arena's runners and cross-judge pool, interrogate's reviewers, and setup-pstack's step 5 sheet follow. On this Mac, on janus, and on agents-fsn1, `orchestrator_capabilities` with `search: "gemini-4-neon"` lists `gemini-4-neon` under `antigravity` with levels low, medium, high, and xhigh.
+- **The level rules follow Lauren's.** 2.4.1's "A Gemini seat never runs above a `high` reasoning level" now reads "A Gemini seat runs at an `xhigh` reasoning level unless its line names another level". setup-pstack's budget step drops the high cap, says Neon's levels run from `low` to `xhigh` with no `max`, and gives a Neon panel entry its own target, written as `thought_level=xhigh`, `high`, or `medium` on Antigravity.
+- **The migration keeps the entry's provider instance.** A Neon entry at a `high` reasoning level, or another Gemini 4 panel entry, becomes Gemini 4 Neon at `xhigh` on the same provider instance, such as `antigravity/gemini-4-neon thought_level=xhigh`, if `orchestrator_capabilities` with `search: "gemini-4-neon"` lists it there, as in 2.4.1.
+- **setup-pstack renames the old option.** Step 2 turns an Antigravity entry's `thinking_level` into `thought_level`, at the same value, where `orchestrator_capabilities` lists `thought_level` for its model. So rerunning `/setup-pstack` rewrites an old sheet's Antigravity lines. The checker gains no compatibility rule.
+- **Substitutions.** The three rules that anchored on Lauren's old Gemini sentences move to her new ones. The poteto-mode Gemini rule is now a literal pattern instead of a regex, so a later change of Lauren's level fails the sync instead of keeping this one. The setup-pstack migration and budget rules and poteto-mode's reasoning-option rule write `thought_level`. The rule count stays at 139. The poteto-mode and setup-pstack forks stay at 7 and 32 changed lines.
+
+**Verification.**
+
+On macOS 27.0:
+
+- `bun tools/generate.mjs --check` reports 14 generated files current. `GIT_CONFIG_GLOBAL=/dev/null bun test tests/ --timeout 30000` passes 545, skips 56, and fails 0. The installer's end-to-end test passes 18 of 18. `validate-skills` keeps every local link inside the skills tree.
+- The dry run at `dd24b67` passes for all three components, with no undeclared fork and no substitution that matches nothing.
+- The catalog fixture of `tests/t3-sheet.test.mjs` now lists `thought_level`, as a 1.5 runtime does. Its test that setup-pstack's step 5 sheet dispatches fails on the `thinking_level` defaults with `no option "thinking_level" (has thought_level)` for each panel role, and passes on 2.5.1's. The 2.3.0 sheet in that file keeps the `thinking_level` that 2.3.0 wrote, so its test now expects that one line to fail.
+- With this release installed in throwaway Claude Code and Codex homes, each installed `t3-sheet.mjs` printed `ok: every role line parses and dispatches on this T3` and exited 0 for the new default sheet and for this Mac's sheet, against a catalog built from this Mac's T3, where Antigravity lists `thought_level`. Against the same catalog, 2.5.0's default sheet fails on `no option "thinking_level" (has thought_level)` for each panel role. With that catalog's option renamed back to `thinking_level`, a stand-in for a 1.4.5 runtime, the new default sheet fails on `no option "thought_level" (has thinking_level)`.
+
+This is a patch release. It fixes a broken default, and no user has to act beyond rerunning `/setup-pstack`, as after any release that changes defaults. A role with no line in the sheet runs on the new default, which now dispatches on Antigravity 1.5, and its panel runs take longer at xhigh. A sheet whose Antigravity lines name `thinking_level` fails the checker on a 1.5 runtime, as it did under 2.5.0, and rerunning `/setup-pstack` rewrites those lines to `thought_level` and moves Neon-at-high panel entries to xhigh. The checker gains no rule, so a sheet that sets all three panel roles gets the same verdict from 2.5.1 as from 2.5.0. Neither hooks file changes. On Codex, run `npx -y github:chhoumann/t3-pstack update` as after every release.
+
 ## 2.5.0 - Antigravity threads load t3-pstack, and a fork's installer installs from that fork
 
 T3 threads on the Antigravity provider now load t3-pstack: its skills, its four agents, and the session-start hook that routes work to `poteto-mode`.
