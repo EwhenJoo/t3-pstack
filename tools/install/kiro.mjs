@@ -13,7 +13,7 @@ import { check, isPlainCopy, readJson, tempBeside } from "./common.mjs";
 import { INSTALL_RECORD } from "../plugin.mjs";
 
 const SESSION_START_FILES = ["hooks/session-start.sh", "hooks/session-start-context.md", "skills/setup-pstack/scripts/read-sheet.sh"];
-const copyPath = (home) => join(home.dir, "t3-pstack");
+const copyPath = (home) => join(real(home.dir), "t3-pstack");
 const hooksPath = (home) => join(home.dir, "hooks", "t3-pstack.json");
 const sha256 = (data) => createHash("sha256").update(data).digest("hex");
 
@@ -42,7 +42,6 @@ export const hooksFile = (root) =>
 const real = (path) => (existsSync(path) ? realpathSync(path) : path);
 const inside = (path, dir) => path.startsWith(dir + sep);
 
-// A home reached through a symlink may have linked into the copy by its real path.
 function classify(path, name, root, skills) {
   const stat = lstatSync(path, { throwIfNoEntry: false });
   if (!stat) return { kind: "missing" };
