@@ -752,16 +752,6 @@ describe("Antigravity", () => {
     expect(doctorAntigravity(home, agy).every((c) => c.ok)).toBe(true);
   });
 
-  test("reinstalls a copy whose manifest is missing", () => {
-    const home = antigravityHome();
-    installAntigravity(home, agy);
-    rmSync(join(installedAt(home), ".antigravity-plugin/plugin.json"));
-    expect(doctorAntigravity(home, agy)[0]).toEqual({ name: "installed", ok: false, detail: "not installed", fix: FIX });
-    expect(installAntigravity(home, agy)).toEqual([`installed ${shipped}`]);
-    expect(existsSync(join(installedAt(home), ".antigravity-plugin/plugin.json"))).toBe(true);
-    expect(doctorAntigravity(home, agy)[0]).toEqual({ name: "installed", ok: true, detail: shipped });
-  });
-
   test("doctor fails a plugin the profile's config turns off, and never edits that config", () => {
     const home = antigravityHome();
     installAntigravity(home, agy);
@@ -800,6 +790,16 @@ describe("Antigravity", () => {
     expect(row(run("update")).steps).toEqual([]);
     expect(row(run("doctor")).checks.map((c) => c.name)).toEqual(["installed", "enabled"]);
     expect(existsSync(join(profile, "t3-pstack-models.md"))).toBe(false);
+  });
+
+  test("reinstalls a copy whose manifest is missing", () => {
+    const home = antigravityHome();
+    installAntigravity(home, agy);
+    rmSync(join(installedAt(home), ".antigravity-plugin/plugin.json"));
+    expect(doctorAntigravity(home, agy)[0]).toEqual({ name: "installed", ok: false, detail: "not installed", fix: FIX });
+    expect(installAntigravity(home, agy)).toEqual([`installed ${shipped}`]);
+    expect(existsSync(join(installedAt(home), ".antigravity-plugin/plugin.json"))).toBe(true);
+    expect(doctorAntigravity(home, agy)[0]).toEqual({ name: "installed", ok: true, detail: shipped });
   });
 });
 
