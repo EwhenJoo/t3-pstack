@@ -908,14 +908,14 @@ describe("Kiro", () => {
     expect(doctorKiro(home, kiro).every((c) => c.ok)).toBe(true);
   });
 
-  test("counts its links in a home reached through a symlink as its own, not as collisions", () => {
+  test("installs the same links and hooks file into a home reached through a symlink as through its real path", () => {
     const real = kiroHome();
-    installKiro(real, kiro);
+    mkdirSync(real.dir);
     const alias = kiroHome(join(tmp(), "kiro-alias"));
     symlinkSync(real.dir, alias.dir);
-    expect(doctorKiro(alias, kiro).filter((c) => !c.ok).map((c) => c.name)).toEqual(["skills", "hook"]);
-    expect(installKiro(alias, kiro)).toEqual(["repointed how, why at the copy", `rewrote ${join(alias.dir, "hooks/t3-pstack.json")}, which had changed`]);
-    expect(doctorKiro(alias, kiro).every((c) => c.ok)).toBe(true);
+    installKiro(alias, kiro);
+    expect(installKiro(real, kiro)).toEqual([]);
+    for (const home of [alias, real]) expect(doctorKiro(home, kiro).every((c) => c.ok)).toBe(true);
   });
 
   test("leaves a hand-written hooks file that differs, and doctor fails it as not the installer's", () => {
