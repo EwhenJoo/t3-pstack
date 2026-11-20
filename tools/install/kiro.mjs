@@ -112,7 +112,7 @@ function* files(dir, prefix = "") {
 function readRecord(path) {
   const file = join(path, INSTALL_RECORD);
   const record = existsSync(file) ? readJson(file) : undefined;
-  return record?.installer === "t3-pstack" ? record : undefined;
+  return record?.installer === "t3-pstack" ? { ...record, hooks: [record.hooks].flat() } : undefined;
 }
 
 function extraFiles(path, record) {
@@ -137,8 +137,9 @@ function copyState(path, context) {
 
 const theirs = (state) => state.kind === "foreign" || state.kind === "extra";
 
-function writeRecord(fresh, version, hooks) {
-  const record = { installer: "t3-pstack", version, files: [...files(fresh)], hooks: sha256(hooks) };
+function writeRecord(fresh, version, hooks, old) {
+  const found = hooksState(hooks.path, old, hooks.text);
+  const record = { installer: "t3-pstack", version, files: [...files(fresh)], hooks: [sha256(hooks.text), ...(found.kind === "stale" ? [found.hash] : [])] };
   writeFileSync(join(fresh, INSTALL_RECORD), JSON.stringify(record, null, 2) + "\n", { flag: "wx" });
 }
 
@@ -159,7 +160,7 @@ function replaceCopy(path, state, hooks, context) {
   const fresh = tempBeside(path);
   // cpSync copies a linked root as the link, so the record would land in the source.
   cpSync(realpathSync(context.pluginRoot), fresh, { recursive: true });
-  writeRecord(fresh, context.version, hooks);
+  writeRecord(fresh, context.version, hooks, state.record);
   const old = lstatSync(path, { throwIfNoEntry: false }) ? tempBeside(path) : undefined;
   if (old) renameSync(path, old);
   // Checked again once moved aside, so nothing that landed at the path after
@@ -176,25 +177,25 @@ function replaceCopy(path, state, hooks, context) {
 
 function hooksState(path, record, text) {
   const stat = lstatSync(path, { throwIfNoEntry: false });
-  if (!stat) return "missing";
-  if (!stat.isFile()) return "foreign";
+  if (!stat) return { kind: "missing" };
+  if (!stat.isFile()) return { kind: "foreign" };
   const hash = sha256(readFileSync(path));
-  if (hash === sha256(text)) return "current";
-  return hash === record?.hooks ? "stale" : "foreign";
+  if (hash === sha256(text)) return { kind: "current" };
+  return { kind: record?.hooks.includes(hash) ? "stale" : "foreign", hash };
 }
 
 const HOOK_STEPS = { missing: (path) => `wrote ${path}`, stale: (path) => `rewrote ${path}, which had changed` };
 
 function writeHooks(path, record, text) {
   // Read just before the rename, so a file that landed during the swap stays.
-  const state = hooksState(path, record, text);
-  if (!(state in HOOK_STEPS)) return [];
+  const { kind } = hooksState(path, record, text);
+  if (!(kind in HOOK_STEPS)) return [];
   mkdirSync(dirname(path), { recursive: true });
   // writeAtomic lands on a link's target, so this renames over the path itself.
   const fresh = tempBeside(path);
   writeFileSync(fresh, text, { flag: "wx" });
   renameSync(fresh, path);
-  return [HOOK_STEPS[state](path)];
+  return [HOOK_STEPS[kind](path)];
 }
 
 export function installKiro(home, context) {
@@ -205,9 +206,9 @@ export function installKiro(home, context) {
   // The links and the hooks file point into the copy, so neither goes in
   // while its path holds anything the installer did not put there.
   if (theirs(state)) return [];
-  const text = hooksFile(path);
+  const hooks = { path: hooksPath(home), text: hooksFile(path) };
   // state.record was read before the swap, so it still names the text an earlier release wrote.
-  return [...replaceCopy(path, state, text, context), ...linkSkills(home, context.skills), ...writeHooks(hooksPath(home), state.record, text)];
+  return [...replaceCopy(path, state, hooks, context), ...linkSkills(home, context.skills), ...writeHooks(hooks.path, state.record, hooks.text)];
 }
 
 const INSTALLED = {
@@ -250,8 +251,8 @@ const HOOK = {
 
 function hookCheck(home, record, hint) {
   const path = hooksPath(home);
-  const state = hooksState(path, record, hooksFile(copyPath(home)));
-  return state === "current" ? check("hook", true, path) : check("hook", false, ...HOOK[state](path, hint));
+  const { kind } = hooksState(path, record, hooksFile(copyPath(home)));
+  return kind === "current" ? check("hook", true, path) : check("hook", false, ...HOOK[kind](path, hint));
 }
 
 const ignoredCheck = (ignored, hint) =>
