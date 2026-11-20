@@ -1098,6 +1098,36 @@ describe("Kiro", () => {
     expect(sourceState()).toEqual(before);
   });
 
+  test("the installer CLI rewrites an earlier release's hooks file after an update that stopped before rewriting it", () => {
+    const user = tmp();
+    const bin = join(user, "bin");
+    mkdirSync(bin);
+    symlinkSync(spawnSync("node", ["-p", "process.execPath"], { encoding: "utf8" }).stdout.trim(), join(bin, "node"));
+    writeFileSync(join(bin, "kiro-cli"), "#!/bin/sh\n", { mode: 0o755 });
+    // An earlier release: its own installer, whose hooks file differs, at an earlier version.
+    const earlier = tmp();
+    for (const path of ["tools", "plugins"]) cpSync(join(repoRoot, path), join(earlier, path), { recursive: true, filter: (src) => !src.includes("node_modules") });
+    const edit = (file, from, to) => writeFileSync(join(earlier, file), readFileSync(join(earlier, file), "utf8").replace(from, to));
+    edit("tools/install/kiro.mjs", "timeout: 10,", "timeout: 5,");
+    edit("plugins/pstack/.claude-plugin/plugin.json", `"version": "${shipped}"`, '"version": "2.6.0-rc.1"');
+    const install = (root) => {
+      const r = spawnSync(join(bin, "node"), [join(root, "tools/install.mjs"), "install", "--source", root, "--kiro-home", "~/kiro", "--json"], {
+        cwd: user,
+        env: { PATH: `${bin}:/usr/bin:/bin`, HOME: user },
+        encoding: "utf8",
+      });
+      return JSON.parse(r.stdout).homes.find((h) => h.harness === "kiro").steps;
+    };
+    const hooks = join(user, "kiro/hooks/t3-pstack.json");
+    expect(install(earlier)).toContain("installed 2.6.0-rc.1");
+    const older = readFileSync(hooks, "utf8");
+    expect(install(repoRoot)).toEqual([`updated 2.6.0-rc.1 to ${shipped}`, `rewrote ${hooks}, which had changed`]);
+    const current = readFileSync(hooks, "utf8");
+    writeFileSync(hooks, older);
+    expect(install(repoRoot)).toEqual([`rewrote ${hooks}, which had changed`]);
+    expect(readFileSync(hooks, "utf8")).toBe(current);
+  });
+
   test("the installer CLI fills ~/.kiro in place of each KIRO_HOME that Kiro ignores, and warns with each value", () => {
     const user = tmp();
     const kiroWork = { driver: "kiro", environment: [{ name: "KIRO_HOME", value: "~/.kiro-work" }] };
