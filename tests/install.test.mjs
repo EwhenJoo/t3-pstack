@@ -928,14 +928,15 @@ describe("Kiro", () => {
 
   test("leaves a hooks file that links to a file of the user's, and doctor fails it as not the installer's", () => {
     const home = kiroHome();
+    installKiro(home, kiro);
     const target = join(tmp(), "mine.json");
     writeFileSync(target, '{"mine":true}\n');
     const path = join(home.dir, "hooks/t3-pstack.json");
-    mkdirSync(join(home.dir, "hooks"), { recursive: true });
+    rmSync(path);
     symlinkSync(target, path);
-    expect(installKiro(home, kiro)).toEqual([`installed ${shipped}`, "linked 2 skills"]);
+    expect(installKiro(home, kiro)).toEqual([]);
     expect(readlinkSync(path)).toBe(target);
-    expect(readFileSync(target, "utf8")).toBe('{"mine":true}\n');
+    expect(readFileSync(target)).toEqual(Buffer.from('{"mine":true}\n'));
     expect(doctorKiro(home, kiro).at(-1)).toEqual({ name: "hook", ok: false, detail: `${path} is not a file the installer wrote`, fix: `move or delete it, then ${FIX}` });
   });
 
