@@ -629,14 +629,26 @@
     {
       "pattern": "status comes from the mode's watcher at `scripts/watch-pr/watch-pr`.",
       "files": "^skills/poteto-mode/playbooks/",
-      "replacement": "status comes from the mode's watcher at `<plugin root>/skills/poteto-mode/scripts/watch-pr/watch-pr`. Run `drive` as a loop inside the turn: run the watcher with `--timeout 540` and the shell's own timeout above 540 seconds and under the 600-second tool cap, act on its verdict, and run it again. Report and stop when the verdict's head SHA, kind, and reason have not changed for two hours, or after three hours in all. A `BLOCKER` with reason `review-required` or `merge-blocked` (exit 6) needs a person, so report it and stop the loop instead of rerunning the watcher. A wait for a human review is `watch_pull_request` and the end of the turn, because another account's review wakes the thread. Unwatch with `unwatch_pull_request` when babysitting stops.",
-      "rationale": "Playbooks: Babysit drive. A skill-relative path does not resolve from the project directory, the watcher has no deadline by default and a shell call stops at the 600-second tool cap, and the exit 6 merge gates come from pstack-claude #95 (t3-pstack 2.0.0-rc.2)"
+      "replacement": "status comes from the mode's watcher at `<plugin root>/skills/poteto-mode/scripts/watch-pr/watch-pr`. When the session can call T3's `watch_pull_request`, `drive` waits on it instead of looping. Register the PR with it, then run the watcher once with the `check`-mode flags below and act on what it shows, because the watch does not wake for a state the PR already has. While the PR still waits, end the turn, and on each wake run the watcher the same way. If only review settling is left, run one round of the loop below instead, because no event wakes the thread when the PR settles. Unwatch with `unwatch_pull_request` when babysitting stops. A delegated child neither watches nor loops: it reports the wait to the agent that started it. Any other session without `watch_pull_request` runs `drive` as a loop inside the turn: run the watcher with `--timeout 540` and the shell's own timeout above 540 seconds and under the 600-second tool cap, act on its verdict, and run it again. Report and stop when the verdict's head SHA, kind, and reason have not changed for two hours, or after three hours in all. A `BLOCKER` with reason `review-required` or `merge-blocked` (exit 6) needs a person, so report it and stop the loop instead of rerunning the watcher.",
+      "rationale": "Playbooks: Babysit drive. With T3's watch_pull_request, drive waits on the watch and ends the turn instead of looping the watcher in 540-second shell calls (#88, the idea @yqecea proposed in #76), so a session has one way to wait on a PR. Each wake takes one --status-only snapshot, so the watcher's readiness rules, review settling included, still decide the next step. No event wakes the thread when review activity settles, so that wait alone takes one bounded watcher call. The first snapshot runs right after registering, since T3 does not wake for checks or conflicts already in place. A delegate_task child neither watches nor loops, per worker.md, so the loop is only for sessions outside T3's watch. Without watch_pull_request the loop stays. A skill-relative path does not resolve from the project directory, the watcher has no deadline by default and a shell call stops at the 600-second tool cap, and the exit 6 merge gates come from pstack-claude #95 (t3-pstack 2.0.0-rc.2)"
     },
     {
       "pattern": "`scripts/watch-pr/watch-pr --queued-stack` under `/loop` until it reports `COMPLETE` at the ceiling. Pass the run's PR numbers, bottom-to-top, in `--stack-prs`, and pass the same list each time you restart the watcher.",
       "files": "^skills/poteto-mode/playbooks/",
       "replacement": "`<plugin root>/skills/poteto-mode/scripts/watch-pr/watch-pr --queued-stack` as a loop inside the turn until it reports `COMPLETE` at the ceiling. Pass the run's PR numbers, bottom-to-top, in `--stack-prs`, and pass the same list each time you restart the watcher. Run it with `--timeout 540` and the shell's own timeout above 540 seconds and under the 600-second tool cap, check the ceiling after each return, and report and stop after three hours. `watch_pull_request` cannot stand in here, because it does not wake on a merge or on merge-queue state.",
       "rationale": "Playbooks: Shipping (the watcher loops inside the turn); a skill-relative path does not resolve from the project directory"
+    },
+    {
+      "pattern": "Merge it once its checks pass and its verdict survives.",
+      "files": "^skills/poteto-mode/playbooks/shipping\\.md$",
+      "replacement": "Merge it once its checks pass and its verdict survives. When the session can call T3's `watch_pull_request`, wait for those checks on it as Babysit's `drive` does.",
+      "rationale": "Playbooks: Shipping. After step 4's push, the wait for the next PR's checks registers the PR with T3's watch_pull_request and ends the turn, as Babysit's drive does, instead of looping the watcher (#88, the idea @yqecea proposed in #76)"
+    },
+    {
+      "pattern": "On GitHub, watch the run with",
+      "files": "^skills/poteto-mode/playbooks/shipping\\.md$",
+      "replacement": "On GitHub, when a merge queue or auto-merge lands the run, or the session cannot call `watch_pull_request`, watch the run with",
+      "rationale": "Playbooks: Shipping. T3's watch_pull_request does not wake on a merge or on merge-queue state, so a run that a merge queue or auto-merge lands keeps the queued watcher loop, and a session without watch_pull_request keeps it too (#88, the idea @yqecea proposed in #76)"
     },
     {
       "pattern": "run `scripts/worktree-audit.sh",

@@ -2,6 +2,28 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-T3 rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 2.6.1 - Babysit and Shipping wait on T3's PR watch
+
+Babysit's `drive` and Shipping's wait for the next PR's checks looped pstack's watcher inside the turn, in shell calls of up to 540 seconds. T3's `watch_pull_request` wakes a thread when a PR's checks, reviews, comments, or conflicts change, and agents already wait on it. A count of the maintainer's sessions found the watcher loop in 3 sessions and `watch_pull_request` in about 150. So the playbooks now wait one way on T3. The reason is simplicity, not time saved. The idea came from @yqecea in [#76](https://github.com/chhoumann/t3-pstack/pull/76), and [#88](https://github.com/chhoumann/t3-pstack/issues/88) tracked it.
+
+**Babysit.** When the session can call T3's `watch_pull_request`, `drive` registers the PR with it and ends the turn. On each wake it runs the watcher once with the `check`-mode flags, `--status-only --timeout 120 --max-query-errors 2`, acts on what it shows, and ends the turn again while the PR still waits. That snapshot reads the PR as the watcher does, review settling included, so the watcher's rules still decide the next step. No event wakes the thread when review activity settles, so when only settling is left, the agent runs one round of the watcher loop, which returns when the PR settles or after 540 seconds. A delegated child never watches and reports the wait to the agent that started it, as `worker.md` says.
+
+**Shipping.** After step 4 pushes the next PR, the wait for its checks goes through `watch_pull_request` as Babysit's `drive` does. `watch_pull_request` does not wake on a merge or on merge-queue state, so a run that a merge queue or auto-merge lands keeps step 5's queued watcher loop.
+
+**Without `watch_pull_request`**, as in a harness or session outside T3, both playbooks keep the watcher loops they had.
+
+**How the port carries it.** Babysit's change is a new replacement for its existing watcher rule in `tools/substitutions.json`. It drops the sentence that made only a wait for a human review a `watch_pull_request` wait, since every wait on T3 now is one. Shipping gets two rules scoped to `shipping.md`, anchored on Lauren's sentences "Merge it once its checks pass and its verdict survives." and "On GitHub, watch the run with". `tools/forks.json` declares `shipping.md` a fork, so its copy carries the same text, and its own lines still differ from derived upstream by the 4 the fork declares. `tests/sync.test.mjs` checks that each insert survives, and its three new or changed entries fail against 2.6.0's rules.
+
+This is a port release. It syncs nothing from upstream, so all three components stay pinned at cursor/plugins `0b46ec3`. It is a patch release, since it changes how two playbooks behave and adds no skill, capability, or harness, and no user has to act on it. Neither pinned hooks file changes. Run `npx -y github:chhoumann/t3-pstack update` after it, as after every release, so Codex trusts the hook again.
+
+**Verification.**
+
+On macOS 27.0:
+
+- `bun tools/generate.mjs --check` reports 14 generated files current. `GIT_CONFIG_GLOBAL=/dev/null bun test tests/ --timeout 30000` passes 589, skips 63, and fails 0. The installer's end-to-end test passes 21 of 21. `validate-skills` keeps every local link inside the skills tree.
+- The dry run of each component at `0b46ec3` exits 0: pstack leaves 500 files unchanged with 16 declared forks and 630 changed lines, as on 2.6.0, cursor-team-kit leaves 6 unchanged, and thermos leaves 5 unchanged.
+- `watch-pr --status-only --timeout 120 --max-query-errors 2` on a real PR prints one status table and exits 0.
+
 ## 2.6.0 - Kiro threads load t3-pstack
 
 T3 threads on the Kiro provider now load t3-pstack: its skills, as plain Kiro skills, and the session-start hook that routes work to `poteto-mode`.
