@@ -2,6 +2,27 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-T3 rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 2.7.1 - /reframe lists the problems a vague description could be
+
+t3-pstack moves to Lauren Tan's pstack at cursor/plugins `9e278fe` ([pstack #1326](https://github.com/cursor/plugins/pull/1326)) for all three components, and pstack's version moves from 0.15.47 to 0.15.48. Only pstack changed upstream. cursor-team-kit and thermos have no change between `2dd5c0c` and `9e278fe`, and their pins move with pstack's.
+
+**What changed upstream.** `reframe` gains a step before its terms. When your description could name more than one problem, it first lists the two or three problems it could be, each with the one term that names it and the sign that would tell it apart from the others. Then it teaches the words for the most likely one and says why it picked it. Before, it gave its terms for whichever problem it read your description as.
+
+**What the port adapted.** Nothing. `bun tools/sync.mjs` updated `skills/reframe/SKILL.md`, with no merge and no conflict. No substitution matches the new paragraph, so the skill stays byte-identical to upstream at `9e278fe`. The paragraph names no Cursor mechanism, so it reads the same on T3. The 142 rules and the 16 declared forks are unchanged. poteto-help's reframe row has no change upstream. Upstream's reworded README row and its version bump sit outside every synced component.
+
+This is a patch release, since it rewords a skill and adds no skill, capability, or harness. No user has to act, and neither hooks file changes. Run `npx -y github:chhoumann/t3-pstack update` after it, as after every release, so Codex trusts the hook again.
+
+**Verification.**
+
+On macOS 27.0:
+
+- `bun tools/generate.mjs --check` reports 14 generated files current. `GIT_CONFIG_GLOBAL=/dev/null bun test tests/ --timeout 30000` passes 589, skips 63, and fails 0. `validate-skills` keeps every local link inside the skills tree.
+- The dry run of each component at `9e278fe` exits 0: pstack leaves 501 files unchanged with 16 declared forks and 630 changed lines, as on 2.7.0, cursor-team-kit leaves 6 unchanged, and thermos leaves 5 unchanged.
+- `skills/reframe/SKILL.md` matches upstream's file at `9e278fe` byte for byte, by `cmp` against `git show 9e278fe:pstack/skills/reframe/SKILL.md`.
+- The vendored scripts typecheck, `bun test watch-pr` passes 106 of 106, and Prettier passes on the port's own TypeScript. The installer's CLI test passes 2 of 2, and the Windows hook test skips all 23 on macOS.
+- The skill script tests, on Node 26.13.1 without TLC, pass 303, skip 70, and fail only the launcher symlink test under `/var`, as 2.5.2 recorded. With a physical `TMPDIR` they pass 304, skip 70, and fail 0.
+- shellcheck, actionlint 1.7.12, markdownlint-cli2 0.18.1, and lychee 0.24.2's offline link check pass.
+
 ## 2.7.0 - /reframe teaches the expert words for what you're building
 
 t3-pstack moves to Lauren Tan's pstack at cursor/plugins `2dd5c0c` ([pstack #1324](https://github.com/cursor/plugins/pull/1324)) for all three components, and pstack's version moves from 0.15.46 to 0.15.47. Only pstack changed upstream. cursor-team-kit and thermos have no change between `0b46ec3` and `2dd5c0c`, and their pins move with pstack's.
