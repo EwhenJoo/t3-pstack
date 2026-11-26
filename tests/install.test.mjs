@@ -2,9 +2,10 @@
 // finds, how it repairs a stale Claude Code record, how it moves the model
 // sheet, and what doctor reports. tests/install-e2e.test.mjs drives the real
 // CLIs.
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import * as fs from "node:fs";
 import {
   chmodSync,
   cpSync,
@@ -204,6 +205,16 @@ describe("discoverHomes", () => {
     });
   });
 
+  test("reads T3 settings that PowerShell wrote with a UTF-8 byte-order mark", () => {
+    const t3 = tmp();
+    mkdirSync(join(t3, "userdata"), { recursive: true });
+    const settings = { providerInstances: { antigravity: { driver: "antigravity", enabled: true } } };
+    writeFileSync(join(t3, "userdata/settings.json"), `\uFEFF${JSON.stringify(settings)}\n`);
+    const found = discoverHomes({ env: { T3CODE_HOME: t3 }, home: "/home/u" });
+    expect(found.settings).toEqual({ path: join(t3, "userdata/settings.json"), instances: 1, error: undefined, secrets: [] });
+    expect(found.homes.map((h) => h.harness)).toEqual(["claude", "codex", "antigravity"]);
+  });
+
   test("falls back to the defaults when T3's settings are missing", () => {
     const t3 = tmp();
     expect(discoverHomes({ env: { T3CODE_HOME: t3 }, home: "/home/u" })).toEqual({
@@ -328,13 +339,30 @@ describe("a stale other-scope Claude Code record", () => {
     expect(doctorClaude(home, context).filter((c) => !c.ok)).toEqual([]);
   });
 
-  test("doctor leaves a user's own skill that shares a plugin skill's name", () => {
+  const SAME_NAME_FIX = "delete each old copy of a t3-pstack skill, and rename your own; Claude Code loads them beside the plugin's";
+
+  test("doctor only warns on a user's own skill that shares a plugin skill's name", () => {
     const { dir } = claudeHome({ autoUpdate: true });
     syncScopedRecords(dir);
     mkdirSync(join(dir, "skills/how"), { recursive: true });
     writeFileSync(join(dir, "skills/how/SKILL.md"), "---\nname: how\ndescription: My own notes on how things work.\n---\n");
     const home = { harness: "claude", dir, from: ["default"], bin: "claude" };
-    expect(doctorClaude(home, context).filter((c) => !c.ok)).toEqual([]);
+    expect(doctorClaude(home, context).filter((c) => !c.ok)).toEqual([
+      { name: "same-name skills", ok: false, detail: `${join(dir, "skills/how")} share a plugin skill's name, not its SKILL.md`, fix: SAME_NAME_FIX, warn: true },
+    ]);
+  });
+
+  test("doctor warns on a stale same-name copy of a plugin skill, and fails a plain copy with CRLF line ends", () => {
+    const { dir } = claudeHome({ autoUpdate: true });
+    syncScopedRecords(dir);
+    for (const name of ["how", "why"]) mkdirSync(join(dir, "skills", name), { recursive: true });
+    writeFileSync(join(dir, "skills/how/SKILL.md"), `${SKILL("how")}\nA line an older release had.\n`);
+    writeFileSync(join(dir, "skills/why/SKILL.md"), SKILL("why").replaceAll("\n", "\r\n"));
+    const home = { harness: "claude", dir, from: ["default"], bin: "claude" };
+    expect(doctorClaude(home, context).filter((c) => !c.ok)).toEqual([
+      { name: "no plain copies of plugin skills", ok: false, detail: join(dir, "skills/why"), fix: "delete these folders; the plugin ships the same skills" },
+      { name: "same-name skills", ok: false, detail: `${join(dir, "skills/how")} share a plugin skill's name, not its SKILL.md`, fix: SAME_NAME_FIX, warn: true },
+    ]);
   });
 
   test("doctor fails an install whose files are gone, and install reinstalls it", () => {
@@ -587,6 +615,40 @@ describe("the model sheet", () => {
     expect(readlinkSync(join(root, ".claude/t3-pstack-models.md"))).toBe(join(root, "dotfiles/models.md"));
   });
 
+  test("copies the sheet into each home where symlinks fail with EPERM, as on Windows without Developer Mode, and doctor warns", () => {
+    const { root, homes, sheet } = machine();
+    const [claude, codex, pool] = homes.map(({ dir }) => join(dir, "t3-pstack-models.md"));
+    writeFileSync(claude, SHEET);
+    const eperm = spyOn(fs, "symlinkSync").mockImplementation((_, path) => {
+      throw Object.assign(new Error(`EPERM: operation not permitted, symlink '${sheet}' -> '${path}'`), { code: "EPERM" });
+    });
+    try {
+      expect(moveSheet(sheet, homes)).toEqual([
+        `moved the sheet from ${claude}`,
+        `copied it to ${codex}, since this system refused a symlink`,
+        `copied it to ${pool}, since this system refused a symlink`,
+      ]);
+      for (const path of [sheet, claude, codex, pool]) expect([lstatSync(path).isSymbolicLink(), readFileSync(path, "utf8")]).toEqual([false, SHEET]);
+      expect(existsSync(join(root, ".claude-never-run"))).toBe(false);
+      expect(moveSheet(sheet, homes)).toEqual([]);
+      expect(doctorSheet(sheet, homes, { catalog: null, roles, tiers, hint: FIX })).toEqual([
+        { name: "machine sheet valid", ok: true, detail: "every line parses (pass --catalog to check targets)" },
+        { name: "home sheets", ok: true, detail: "none differ from it" },
+        {
+          name: "home sheet copies",
+          ok: false,
+          detail: `${claude}, ${codex}, ${pool} copy it and won't follow later edits to it`,
+          fix: `${FIX} to link each; on Windows, turn on Developer Mode first`,
+          warn: true,
+        },
+      ]);
+    } finally {
+      eperm.mockRestore();
+    }
+    expect(moveSheet(sheet, homes)).toEqual([`linked ${claude} to it`, `linked ${codex} to it`, `linked ${pool} to it`]);
+    expect(doctorSheet(sheet, homes, { catalog: null, roles, tiers, hint: FIX }).filter((c) => !c.ok)).toEqual([]);
+  });
+
   test("moves a sheet with its mode, and leaves a file beside it that only shares the old temp name", () => {
     const { root, homes, sheet } = machine();
     writeFileSync(join(root, ".claude/t3-pstack-models.md"), SHEET, { mode: 0o600 });
@@ -759,6 +821,19 @@ describe("Antigravity", () => {
     writeJson(config, { plugins: { "t3-pstack": { enabled: false } } });
     expect(installAntigravity(home, agy)).toEqual([]);
     expect(JSON.parse(readFileSync(config, "utf8"))).toEqual({ plugins: { "t3-pstack": { enabled: false } } });
+    expect(doctorAntigravity(home, agy)[1]).toEqual({
+      name: "enabled",
+      ok: false,
+      detail: `no, ${config} turns it off`,
+      fix: 'turn t3-pstack on in that file\'s "plugins" map',
+    });
+  });
+
+  test("doctor reads a profile config.json that PowerShell wrote with a UTF-8 byte-order mark", () => {
+    const home = antigravityHome();
+    const config = join(home.dir, "config/config.json");
+    writeFileSync(config, `\uFEFF${JSON.stringify({ plugins: { "t3-pstack": { enabled: false } } })}\n`);
+    expect(installAntigravity(home, agy)).toEqual([`installed ${shipped}`]);
     expect(doctorAntigravity(home, agy)[1]).toEqual({
       name: "enabled",
       ok: false,
