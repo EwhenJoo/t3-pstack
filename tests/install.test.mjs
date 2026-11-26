@@ -2,9 +2,10 @@
 // finds, how it repairs a stale Claude Code record, how it moves the model
 // sheet, and what doctor reports. tests/install-e2e.test.mjs drives the real
 // CLIs.
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import * as fs from "node:fs";
 import {
   chmodSync,
   cpSync,
@@ -595,6 +596,40 @@ describe("the model sheet", () => {
       `linked ${join(root, ".codex-pool/t3-pstack-models.md")} to it`,
     ]);
     expect(readlinkSync(join(root, ".claude/t3-pstack-models.md"))).toBe(join(root, "dotfiles/models.md"));
+  });
+
+  test("copies the sheet into each home where symlinks fail with EPERM, as on Windows without Developer Mode, and doctor warns", () => {
+    const { root, homes, sheet } = machine();
+    const [claude, codex, pool] = homes.map(({ dir }) => join(dir, "t3-pstack-models.md"));
+    writeFileSync(claude, SHEET);
+    const eperm = spyOn(fs, "symlinkSync").mockImplementation((_, path) => {
+      throw Object.assign(new Error(`EPERM: operation not permitted, symlink '${sheet}' -> '${path}'`), { code: "EPERM" });
+    });
+    try {
+      expect(moveSheet(sheet, homes)).toEqual([
+        `moved the sheet from ${claude}`,
+        `copied it to ${codex}, since this system refused a symlink`,
+        `copied it to ${pool}, since this system refused a symlink`,
+      ]);
+      for (const path of [sheet, claude, codex, pool]) expect([lstatSync(path).isSymbolicLink(), readFileSync(path, "utf8")]).toEqual([false, SHEET]);
+      expect(existsSync(join(root, ".claude-never-run"))).toBe(false);
+      expect(moveSheet(sheet, homes)).toEqual([]);
+      expect(doctorSheet(sheet, homes, { catalog: null, roles, tiers, hint: FIX })).toEqual([
+        { name: "machine sheet valid", ok: true, detail: "every line parses (pass --catalog to check targets)" },
+        { name: "home sheets", ok: true, detail: "none differ from it" },
+        {
+          name: "home sheet copies",
+          ok: false,
+          detail: `${claude}, ${codex}, ${pool} copy it and won't follow later edits to it`,
+          fix: `${FIX} to link each; on Windows, turn on Developer Mode first`,
+          warn: true,
+        },
+      ]);
+    } finally {
+      eperm.mockRestore();
+    }
+    expect(moveSheet(sheet, homes)).toEqual([`linked ${claude} to it`, `linked ${codex} to it`, `linked ${pool} to it`]);
+    expect(doctorSheet(sheet, homes, { catalog: null, roles, tiers, hint: FIX }).filter((c) => !c.ok)).toEqual([]);
   });
 
   test("moves a sheet with its mode, and leaves a file beside it that only shares the old temp name", () => {
