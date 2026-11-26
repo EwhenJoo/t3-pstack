@@ -5,7 +5,7 @@
 // writes ~/.gemini whatever GEMINI_HOME says, so the installer copies the
 // plugin tree into each profile itself. The older ACP runtime (1.4.x) that
 // earlier T3 releases installed loads no plugins or session-start hooks.
-import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { check, pluginIntact, readJson, tempBeside } from "./common.mjs";
@@ -16,13 +16,26 @@ const DIR = "t3-pstack";
 
 const installPath = (home) => join(home.dir, "config", "plugins", DIR);
 const installedVersion = (path) => (existsSync(join(path, ANTIGRAVITY_MANIFEST)) ? readJson(join(path, ANTIGRAVITY_MANIFEST)).version : undefined);
-// The session-start hook's files: the hooks file agy reads, its script, and
-// what the script reads. A copy routes as released only while each matches
-// the plugin this run installs.
-const HOOK_FILES = ["hooks.json", "hooks/session-start.sh", "hooks/session-start-context.md", "skills/setup-pstack/scripts/read-sheet.sh"];
-const intact = (path, pluginRoot, skills) =>
+
+// agy loads a plugin's hooks only from hooks.json at its root, and runs each
+// command in that directory with `sh -c` on Unix and `cmd /c` on Windows. Its
+// hooks file has no Windows command, so the installer writes the copy's
+// hooks.json for the platform it runs on. The plugin's own root hooks.json is
+// Devin's.
+const hookCommand = (platform) =>
+  platform === "win32" ? "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./hooks/session-start.ps1 antigravity" : "sh ./hooks/session-start.sh antigravity";
+export const hooksFile = (platform) =>
+  JSON.stringify({ "t3-pstack": { SessionStart: [{ type: "command", command: hookCommand(platform) }] } }, null, 2) + "\n";
+
+// The session-start hook's scripts and what they read. A copy routes as
+// released only while each matches the plugin this run installs, and its
+// hooks.json is the one this run writes.
+const HOOK_FILES = ["hooks/session-start.sh", "hooks/session-start.ps1", "hooks/session-start-context.md", "skills/setup-pstack/scripts/read-sheet.sh"];
+const intact = (path, { pluginRoot, skills, platform }) =>
   pluginIntact(path, ANTIGRAVITY_MANIFEST, skills) &&
-  HOOK_FILES.every((file) => existsSync(join(path, file)) && readFileSync(join(path, file)).equals(readFileSync(join(pluginRoot, file))));
+  HOOK_FILES.every((file) => existsSync(join(path, file)) && readFileSync(join(path, file)).equals(readFileSync(join(pluginRoot, file)))) &&
+  existsSync(join(path, "hooks.json")) &&
+  readFileSync(join(path, "hooks.json"), "utf8") === hooksFile(platform);
 // config.json wins over the manifest wherever it has an entry, and the
 // manifest ships the plugin on.
 const enabled = (home) => {
@@ -30,10 +43,10 @@ const enabled = (home) => {
   return !existsSync(config) || readJson(config).plugins?.[DIR]?.enabled !== false;
 };
 
-export function installAntigravity(home, { pluginRoot, version, skills }) {
+export function installAntigravity(home, { pluginRoot, version, skills, platform = process.platform }) {
   const path = installPath(home);
   const before = installedVersion(path);
-  if (before === version && intact(path, pluginRoot, skills)) return [];
+  if (before === version && intact(path, { pluginRoot, skills, platform })) return [];
   // T3 creates the profile private, and keeps it so when it starts the instance.
   mkdirSync(home.dir, { recursive: true, mode: 0o700 });
   mkdirSync(dirname(path), { recursive: true });
@@ -41,6 +54,7 @@ export function installAntigravity(home, { pluginRoot, version, skills }) {
   // and files a release dropped do not linger.
   const fresh = tempBeside(path);
   cpSync(pluginRoot, fresh, { recursive: true });
+  writeFileSync(join(fresh, "hooks.json"), hooksFile(platform));
   const old = existsSync(path) ? tempBeside(path) : undefined;
   if (old) renameSync(path, old);
   renameSync(fresh, path);
@@ -48,10 +62,10 @@ export function installAntigravity(home, { pluginRoot, version, skills }) {
   return [before === undefined ? `installed ${version}` : before === version ? `reinstalled ${version}, whose files were missing or changed` : `updated ${before} to ${version}`];
 }
 
-export function doctorAntigravity(home, { pluginRoot, version, skills, hint }) {
+export function doctorAntigravity(home, { pluginRoot, version, skills, hint, platform = process.platform }) {
   const path = installPath(home);
   const installed = installedVersion(path);
-  const whole = intact(path, pluginRoot, skills);
+  const whole = intact(path, { pluginRoot, skills, platform });
   const on = enabled(home);
   return [
     check(
