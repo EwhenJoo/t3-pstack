@@ -15,10 +15,14 @@ export const HOME_REPO = "chhoumann/t3-pstack";
 // pathExpansion.ts). `~user` does not.
 export const expandHome = (path, home) => (path === "~" ? home : /^~[/\\]/.test(path) ? join(home, path.slice(2)) : path);
 
+// A JSON file's text without the UTF-8 byte-order mark that PowerShell writes
+// and JSON.parse rejects.
+export const readJsonText = (path) => readFileSync(path, "utf8").replace(/^\uFEFF/, "");
+
 // JSON.parse's message quotes the text around the fault, which can hold a token.
 export function readJson(path) {
   try {
-    return JSON.parse(readFileSync(path, "utf8"));
+    return JSON.parse(readJsonText(path));
   } catch (err) {
     throw err instanceof SyntaxError ? new Error(`${path}: invalid JSON`) : err;
   }

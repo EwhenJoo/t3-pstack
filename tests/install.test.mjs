@@ -204,6 +204,16 @@ describe("discoverHomes", () => {
     });
   });
 
+  test("reads T3 settings that PowerShell wrote with a UTF-8 byte-order mark", () => {
+    const t3 = tmp();
+    mkdirSync(join(t3, "userdata"), { recursive: true });
+    const settings = { providerInstances: { antigravity: { driver: "antigravity", enabled: true } } };
+    writeFileSync(join(t3, "userdata/settings.json"), `\uFEFF${JSON.stringify(settings)}\n`);
+    const found = discoverHomes({ env: { T3CODE_HOME: t3 }, home: "/home/u" });
+    expect(found.settings).toEqual({ path: join(t3, "userdata/settings.json"), instances: 1, error: undefined, secrets: [] });
+    expect(found.homes.map((h) => h.harness)).toEqual(["claude", "codex", "antigravity"]);
+  });
+
   test("falls back to the defaults when T3's settings are missing", () => {
     const t3 = tmp();
     expect(discoverHomes({ env: { T3CODE_HOME: t3 }, home: "/home/u" })).toEqual({
@@ -759,6 +769,19 @@ describe("Antigravity", () => {
     writeJson(config, { plugins: { "t3-pstack": { enabled: false } } });
     expect(installAntigravity(home, agy)).toEqual([]);
     expect(JSON.parse(readFileSync(config, "utf8"))).toEqual({ plugins: { "t3-pstack": { enabled: false } } });
+    expect(doctorAntigravity(home, agy)[1]).toEqual({
+      name: "enabled",
+      ok: false,
+      detail: `no, ${config} turns it off`,
+      fix: 'turn t3-pstack on in that file\'s "plugins" map',
+    });
+  });
+
+  test("doctor reads a profile config.json that PowerShell wrote with a UTF-8 byte-order mark", () => {
+    const home = antigravityHome();
+    const config = join(home.dir, "config/config.json");
+    writeFileSync(config, `\uFEFF${JSON.stringify({ plugins: { "t3-pstack": { enabled: false } } })}\n`);
+    expect(installAntigravity(home, agy)).toEqual([`installed ${shipped}`]);
     expect(doctorAntigravity(home, agy)[1]).toEqual({
       name: "enabled",
       ok: false,
