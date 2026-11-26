@@ -753,14 +753,21 @@ const pluginRoot = join(repoRoot, "plugins/pstack");
 const shipped = JSON.parse(readFileSync(join(pluginRoot, ".antigravity-plugin/plugin.json"), "utf8")).version;
 const agy = { pluginRoot, version: shipped, skills, hint: FIX };
 const installedAt = (home) => join(home.dir, "config/plugins/t3-pstack");
+// The hooks file agy reads from the copy, which runs its command in the copy
+// with `sh -c` on Unix and `cmd /c` on Windows.
+const agyHooks = (home) => JSON.parse(readFileSync(join(installedAt(home), "hooks.json"), "utf8"));
+const agyHook = (command) => ({ "t3-pstack": { SessionStart: [{ type: "command", command }] } });
+const SH_HOOK = agyHook("sh ./hooks/session-start.sh antigravity");
+const POWERSHELL_HOOK = agyHook("powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./hooks/session-start.ps1 antigravity");
 
 describe("Antigravity", () => {
   test("copies the plugin into the profile, where agy discovers it, and a second run changes nothing", () => {
     const home = antigravityHome();
     expect(installAntigravity(home, agy)).toEqual([`installed ${shipped}`]);
-    for (const file of ["hooks.json", ".antigravity-plugin/plugin.json", "hooks/session-start.sh", "skills/poteto-mode/SKILL.md"]) {
+    for (const file of [".antigravity-plugin/plugin.json", "hooks/session-start.sh", "hooks/session-start.ps1", "skills/poteto-mode/SKILL.md"]) {
       expect(readFileSync(join(installedAt(home), file))).toEqual(readFileSync(join(pluginRoot, file)));
     }
+    expect(agyHooks(home)).toEqual(process.platform === "win32" ? POWERSHELL_HOOK : SH_HOOK);
     expect(installAntigravity(home, agy)).toEqual([]);
     expect(readdirSync(join(home.dir, "config/plugins"))).toEqual(["t3-pstack"]);
     expect(doctorAntigravity(home, agy)).toEqual([
@@ -793,8 +800,8 @@ describe("Antigravity", () => {
     const remove = (path) => rmSync(path);
     const change = (path) => writeFileSync(path, "changed\n");
     for (const [file, damage] of [
-      ["hooks.json", remove],
       ["hooks/session-start.sh", remove],
+      ["hooks/session-start.ps1", remove],
       ["hooks/session-start-context.md", change],
       ["skills/setup-pstack/scripts/read-sheet.sh", remove],
     ]) {
@@ -805,6 +812,54 @@ describe("Antigravity", () => {
       expect(installAntigravity(home, agy)).toEqual([`reinstalled ${shipped}, whose files were missing or changed`]);
       expect(readFileSync(join(installedAt(home), file))).toEqual(readFileSync(join(pluginRoot, file)));
     }
+  });
+
+  // The plugin's own root hooks.json is Devin's, which agy cannot read.
+  test("rewrites a hooks.json that is missing, Devin's, or another platform's", () => {
+    const linux = { ...agy, platform: "linux" };
+    for (const damage of [
+      (path) => rmSync(path),
+      (path) => cpSync(join(pluginRoot, "hooks.json"), path),
+      (path) => writeFileSync(path, `${JSON.stringify(POWERSHELL_HOOK, null, 2)}\n`),
+    ]) {
+      const home = antigravityHome();
+      installAntigravity(home, linux);
+      damage(join(installedAt(home), "hooks.json"));
+      expect(doctorAntigravity(home, linux)[0]).toMatchObject({ ok: false, detail: `${shipped}, but its files at ${installedAt(home)} are missing or changed` });
+      expect(installAntigravity(home, linux)).toEqual([`reinstalled ${shipped}, whose files were missing or changed`]);
+      expect(agyHooks(home)).toEqual(SH_HOOK);
+      expect(doctorAntigravity(home, linux)[0]).toEqual({ name: "installed", ok: true, detail: shipped });
+    }
+  });
+
+  // Antigravity runs a hook with `cmd /c` on Windows, where `sh` is missing.
+  test("on Windows, writes a hooks.json that runs the PowerShell hook, and a second run changes nothing", () => {
+    const windows = { ...agy, platform: "win32" };
+    const home = antigravityHome();
+    expect(installAntigravity(home, windows)).toEqual([`installed ${shipped}`]);
+    expect(agyHooks(home)).toEqual(POWERSHELL_HOOK);
+    expect(installAntigravity(home, windows)).toEqual([]);
+    expect(doctorAntigravity(home, windows)).toEqual([
+      { name: "installed", ok: true, detail: shipped },
+      { name: "enabled", ok: true, detail: "yes" },
+    ]);
+    expect(doctorAntigravity(home, { ...agy, platform: "linux" })[0]).toMatchObject({ ok: false });
+  });
+
+  // 2.5.0 to 2.7.2 copied the plugin's root hooks.json, which ran `sh` on every platform.
+  test.each([
+    ["linux", SH_HOOK],
+    ["win32", POWERSHELL_HOOK],
+  ])("updates a 2.5.0 to 2.7.2 copy on %s to this platform's hooks.json", (platform, hooks) => {
+    const context = { ...agy, platform };
+    const home = antigravityHome();
+    installAntigravity(home, context);
+    writeJson(join(installedAt(home), ".antigravity-plugin/plugin.json"), { name: "t3-pstack", version: "2.5.0" });
+    writeFileSync(join(installedAt(home), "hooks.json"), `${JSON.stringify(SH_HOOK, null, 2)}\n`);
+    expect(installAntigravity(home, context)).toEqual([`updated 2.5.0 to ${shipped}`]);
+    expect(agyHooks(home)).toEqual(hooks);
+    expect(installAntigravity(home, context)).toEqual([]);
+    expect(doctorAntigravity(home, context).every((c) => c.ok)).toBe(true);
   });
 
   test("creates a profile T3 has not started yet, private as T3 keeps it", () => {
@@ -862,6 +917,7 @@ describe("Antigravity", () => {
     const first = run("install");
     expect(row(first)).toMatchObject({ dir: profile, steps: [`installed ${shipped}`] });
     expect(row(first).checks.every((c) => c.ok)).toBe(true);
+    expect(JSON.parse(readFileSync(join(profile, "config/plugins/t3-pstack/hooks.json"), "utf8"))).toEqual(SH_HOOK);
     expect(row(run("update")).steps).toEqual([]);
     expect(row(run("doctor")).checks.map((c) => c.name)).toEqual(["installed", "enabled"]);
     expect(existsSync(join(profile, "t3-pstack-models.md"))).toBe(false);
