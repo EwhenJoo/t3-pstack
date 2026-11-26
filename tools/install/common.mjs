@@ -115,10 +115,26 @@ export function marketplaceCheck(sources, { source, trusted }, remove) {
   );
 }
 
-// A plain copy of one of the plugin's skills: its name and its SKILL.md
-// match. A user's own skill that only shares the name is theirs.
-export const isPlainCopy = (name, skillFile, skills) =>
-  skills.has(name) && existsSync(skillFile) && readFileSync(skillFile, "utf8") === skills.get(name);
+// A skill outside the plugin that has a plugin skill's name: "copy" when its
+// SKILL.md matches the plugin's, line ends aside, else "other", such as a copy
+// from an older release or in upstream's Cursor form, or the user's own skill.
+export function sameNameSkill(name, skillFile, skills) {
+  if (!skills.has(name) || !existsSync(skillFile)) return undefined;
+  const lf = (text) => text.replaceAll("\r\n", "\n");
+  return lf(readFileSync(skillFile, "utf8")) === lf(skills.get(name)) ? "copy" : "other";
+}
+
+// Claude Code and Codex load a same-name skill beside the plugin's. A plain
+// copy fails its own check. Another version only warns, since it can be the
+// user's own.
+export const sameNameCheck = (detail, host) =>
+  check(
+    "same-name skills",
+    false,
+    `${detail} share a plugin skill's name, not its SKILL.md`,
+    `delete each old copy of a t3-pstack skill, and rename your own; ${host} loads them beside the plugin's`,
+    true,
+  );
 
 // An install whose recorded version still has its files: the manifest and
 // each skill's SKILL.md.

@@ -339,13 +339,30 @@ describe("a stale other-scope Claude Code record", () => {
     expect(doctorClaude(home, context).filter((c) => !c.ok)).toEqual([]);
   });
 
-  test("doctor leaves a user's own skill that shares a plugin skill's name", () => {
+  const SAME_NAME_FIX = "delete each old copy of a t3-pstack skill, and rename your own; Claude Code loads them beside the plugin's";
+
+  test("doctor only warns on a user's own skill that shares a plugin skill's name", () => {
     const { dir } = claudeHome({ autoUpdate: true });
     syncScopedRecords(dir);
     mkdirSync(join(dir, "skills/how"), { recursive: true });
     writeFileSync(join(dir, "skills/how/SKILL.md"), "---\nname: how\ndescription: My own notes on how things work.\n---\n");
     const home = { harness: "claude", dir, from: ["default"], bin: "claude" };
-    expect(doctorClaude(home, context).filter((c) => !c.ok)).toEqual([]);
+    expect(doctorClaude(home, context).filter((c) => !c.ok)).toEqual([
+      { name: "same-name skills", ok: false, detail: `${join(dir, "skills/how")} share a plugin skill's name, not its SKILL.md`, fix: SAME_NAME_FIX, warn: true },
+    ]);
+  });
+
+  test("doctor warns on a stale same-name copy of a plugin skill, and fails a plain copy with CRLF line ends", () => {
+    const { dir } = claudeHome({ autoUpdate: true });
+    syncScopedRecords(dir);
+    for (const name of ["how", "why"]) mkdirSync(join(dir, "skills", name), { recursive: true });
+    writeFileSync(join(dir, "skills/how/SKILL.md"), `${SKILL("how")}\nA line an older release had.\n`);
+    writeFileSync(join(dir, "skills/why/SKILL.md"), SKILL("why").replaceAll("\n", "\r\n"));
+    const home = { harness: "claude", dir, from: ["default"], bin: "claude" };
+    expect(doctorClaude(home, context).filter((c) => !c.ok)).toEqual([
+      { name: "no plain copies of plugin skills", ok: false, detail: join(dir, "skills/why"), fix: "delete these folders; the plugin ships the same skills" },
+      { name: "same-name skills", ok: false, detail: `${join(dir, "skills/how")} share a plugin skill's name, not its SKILL.md`, fix: SAME_NAME_FIX, warn: true },
+    ]);
   });
 
   test("doctor fails an install whose files are gone, and install reinstalls it", () => {
